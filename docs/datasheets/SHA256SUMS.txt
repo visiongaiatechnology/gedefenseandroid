@@ -1,0 +1,4 @@
+cd77c4a02c370c9cc1064099fa7ee99919fc35eb33f90b1991cd3a7a231bc0fc  docs/datasheets/GeDefense-Mobile-Master-Architecture-DE.pdf
+bda3a1f4ef429b728664d534ca414bffd9cd447b21803596580c4ca049145d24  docs/datasheets/GeDefense-Mobile-Master-Architecture-EN.pdf
+57703f86509a49dac3bb9bc7a714eff2772b1d70d8db50191a81ef7869d4c39e  docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf
+22e5378f3b53c2525e3df61464d278ba13de4054ab5288df2f4f52a75898a811  docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf

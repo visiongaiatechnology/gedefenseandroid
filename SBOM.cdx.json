@@ -1,0 +1,250 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "bom-ref": "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.6",
+      "name": "GeDefense Core",
+      "purl": "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.6",
+      "type": "library",
+      "version": "0.27.8-beta.6"
+    },
+    {
+      "bom-ref": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.6",
+      "name": "GaiaNet V2 Android Helper",
+      "purl": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.6",
+      "type": "application",
+      "version": "0.27.8-beta.6"
+    },
+    {
+      "bom-ref": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "name": "Kotlin Standard Library",
+      "purl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24",
+      "type": "library",
+      "version": "1.9.24"
+    },
+    {
+      "bom-ref": "pkg:golang/golang.zx2c4.com/wireguard@0.0.20250522",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "name": "wireguard-go",
+      "purl": "pkg:golang/golang.zx2c4.com/wireguard@0.0.20250522",
+      "type": "library",
+      "version": "0.0.20250522"
+    },
+    {
+      "bom-ref": "pkg:golang/golang.org/x/crypto@v0.37.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "golang.org/x/crypto",
+      "purl": "pkg:golang/golang.org/x/crypto@v0.37.0",
+      "type": "library",
+      "version": "v0.37.0"
+    },
+    {
+      "bom-ref": "pkg:golang/golang.org/x/net@v0.39.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "golang.org/x/net",
+      "purl": "pkg:golang/golang.org/x/net@v0.39.0",
+      "type": "library",
+      "version": "v0.39.0"
+    },
+    {
+      "bom-ref": "pkg:golang/golang.org/x/sys@v0.32.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "golang.org/x/sys",
+      "purl": "pkg:golang/golang.org/x/sys@v0.32.0",
+      "type": "library",
+      "version": "v0.32.0"
+    },
+    {
+      "bom-ref": "pkg:golang/golang.org/x/term@v0.31.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "golang.org/x/term",
+      "purl": "pkg:golang/golang.org/x/term@v0.31.0",
+      "type": "library",
+      "version": "v0.31.0"
+    },
+    {
+      "bom-ref": "pkg:golang/golang.org/x/text@v0.24.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "name": "golang.org/x/text",
+      "purl": "pkg:golang/golang.org/x/text@v0.24.0",
+      "type": "library",
+      "version": "v0.24.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "dependsOn": [
+        "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.6",
+        "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.6",
+        "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24"
+      ],
+      "ref": "pkg:generic/visiongaia/gedefense-mobile@0.27.8-beta.6"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.6"
+    },
+    {
+      "dependsOn": [
+        "pkg:golang/golang.zx2c4.com/wireguard@0.0.20250522",
+        "pkg:golang/golang.org/x/crypto@v0.37.0",
+        "pkg:golang/golang.org/x/net@v0.39.0",
+        "pkg:golang/golang.org/x/sys@v0.32.0",
+        "pkg:golang/golang.org/x/term@v0.31.0",
+        "pkg:golang/golang.org/x/text@v0.24.0"
+      ],
+      "ref": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.6"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:golang/golang.zx2c4.com/wireguard@0.0.20250522"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:golang/golang.org/x/crypto@v0.37.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:golang/golang.org/x/net@v0.39.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:golang/golang.org/x/sys@v0.32.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:golang/golang.org/x/term@v0.31.0"
+    },
+    {
+      "dependsOn": [],
+      "ref": "pkg:golang/golang.org/x/text@v0.24.0"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "bom-ref": "pkg:generic/visiongaia/gedefense-mobile@0.27.8-beta.6",
+      "name": "VGT GeDefense Mobile",
+      "purl": "pkg:generic/visiongaia/gedefense-mobile@0.27.8-beta.6",
+      "type": "application",
+      "version": "0.27.8-beta.6"
+    },
+    "properties": [
+      {
+        "name": "visiongaia:versionCode",
+        "value": "55"
+      },
+      {
+        "name": "visiongaia:compileSdk",
+        "value": "36"
+      },
+      {
+        "name": "visiongaia:targetSdk",
+        "value": "36"
+      },
+      {
+        "name": "visiongaia:minSdk",
+        "value": "29"
+      },
+      {
+        "name": "visiongaia:goDependencyMode",
+        "value": "offline-local-replace"
+      }
+    ],
+    "tools": {
+      "components": [
+        {
+          "bom-ref": "tool:gradle",
+          "name": "Gradle",
+          "type": "application",
+          "version": "8.7"
+        },
+        {
+          "bom-ref": "tool:agp",
+          "name": "Android Gradle Plugin",
+          "type": "application",
+          "version": "8.5.2"
+        },
+        {
+          "bom-ref": "tool:kotlin-gradle",
+          "name": "Kotlin Gradle Plugin",
+          "type": "application",
+          "version": "1.9.24"
+        },
+        {
+          "bom-ref": "tool:go",
+          "name": "Go",
+          "type": "application",
+          "version": "1.26.8"
+        },
+        {
+          "bom-ref": "tool:android-ndk",
+          "name": "Android NDK",
+          "type": "application",
+          "version": "27.2.12479018"
+        },
+        {
+          "bom-ref": "tool:android-platform",
+          "name": "Android Platform",
+          "type": "framework",
+          "version": "36"
+        },
+        {
+          "bom-ref": "tool:jdk",
+          "name": "JDK target",
+          "type": "application",
+          "version": "17"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:fe2336ee-1d00-505b-bac4-6dcebeae5128",
+  "specVersion": "1.6",
+  "version": 1
+}

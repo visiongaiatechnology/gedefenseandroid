@@ -1,0 +1,20 @@
+name: Feature proposal
+description: Propose a scoped feature with security and privacy impact.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes: {label: Problem to solve}
+    validations: {required: true}
+  - type: textarea
+    id: proposal
+    attributes: {label: Proposed behavior}
+    validations: {required: true}
+  - type: textarea
+    id: security
+    attributes: {label: Security/privacy/privilege impact}
+    validations: {required: true}
+  - type: textarea
+    id: alternatives
+    attributes: {label: Lower-privilege alternatives considered}

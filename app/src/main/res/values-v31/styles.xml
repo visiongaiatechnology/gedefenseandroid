@@ -1,0 +1,8 @@
+<resources>
+    <style name="StartupTheme" parent="AppTheme">
+        <item name="android:windowBackground">#02070D</item>
+        <item name="android:windowSplashScreenBackground">#02070D</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/gedefense_logo</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#02070D</item>
+    </style>
+</resources>

@@ -1,0 +1,27 @@
+.gradle/
+.idea/
+**/build/
+.externalNativeBuild/
+.cxx/
+local.properties
+*.iml
+.DS_Store
+
+# Release/signing secrets and local credentials
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+.env
+.env.*
+!.env.example
+
+# Release artifacts belong in GitHub Releases, not the source tree
+*.apk
+*.aab
+
+# Local logs/temp output
+*.log
+*.tmp

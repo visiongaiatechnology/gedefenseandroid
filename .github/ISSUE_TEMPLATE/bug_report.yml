@@ -1,0 +1,34 @@
+name: Bug / compatibility report
+description: Report a reproducible GeDefense defect without exposing sensitive data.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not post vulnerabilities, packet payloads, private keys, personal files or unredacted sensitive diagnostics in a public issue. Security vulnerabilities: security@visiongaia.de"
+  - type: input
+    id: version
+    attributes: {label: GeDefense version, placeholder: "0.27.0-beta.1"}
+    validations: {required: true}
+  - type: input
+    id: device
+    attributes: {label: Android / device / OEM, placeholder: "Android 16, Pixel / One UI / HyperOS ..."}
+    validations: {required: true}
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Protection mode
+      options: ["Selective Shield", "Full Flow", "TITAN Light", "TITAN Device Owner", "Scanner/XDR only", "Other"]
+    validations: {required: true}
+  - type: textarea
+    id: reproduce
+    attributes: {label: Reproduction steps}
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: Expected behavior}
+    validations: {required: true}
+  - type: textarea
+    id: actual
+    attributes: {label: Actual behavior and sanitized reason codes}
+    validations: {required: true}

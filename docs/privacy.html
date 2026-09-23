@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>GeDefense Mobile Privacy Policy</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef3f8;background:#080b10;line-height:1.65}
+    body{margin:0;padding:32px 18px 64px}.wrap{max-width:920px;margin:auto}.card{background:#10151d;border:1px solid #26303b;border-radius:18px;padding:28px;box-shadow:0 18px 50px rgba(0,0,0,.24)}
+    h1,h2{line-height:1.2}h1{font-size:2rem;margin-top:0}h2{margin-top:2rem;color:#f2c963}code{background:#171e27;padding:.12rem .32rem;border-radius:5px}a{color:#66d9ff}strong{color:#fff}.meta{color:#aeb9c5}.notice{border-left:3px solid #66d9ff;padding-left:14px;color:#cbd5df}
+  </style>
+</head>
+<body><main class="wrap"><article class="card">
+<h1>GeDefense Mobile Privacy Policy</h1>
+<p class="meta"><strong>Product:</strong> VGT GeDefense Mobile<br><strong>Publisher:</strong> VisionGaiaTechnology (VGT)<br><strong>Applies to:</strong> 0.27.0-beta.1 and later releases that reference this policy</p>
+<h2>Privacy model</h2>
+<p>GeDefense Mobile is designed as a local-first Android security product. It does not require a VGT account and does not include advertising, analytics, profiling or third-party crash-reporting SDKs.</p>
+<p>Security findings, policy state, package inventory, signer and permission observations, traffic analytics, scanner results, XDR events and evidence state are processed and stored on the device unless the user explicitly exports a bounded diagnostic bundle through Android's document picker.</p>
+<h2>Local VPN processing</h2>
+<p>GeDefense uses Android <code>VpnService</code> to create an on-device security tunnel for firewall, threat-intelligence and XDR enforcement. It is not a remote consumer VPN service and does not forward traffic to a VisionGaiaTechnology VPN server.</p>
+<p>For local enforcement GeDefense may process destination IP addresses, DNS domain names when visible, protocol and port metadata, flow counters and Android app or UID attribution. GeDefense does not perform TLS or QUIC interception and does not decrypt application payloads.</p>
+<p>Observed destination IPs, DNS queries, package inventory and traffic history are not uploaded to VisionGaiaTechnology.</p>
+<h2>Installed applications and permissions</h2>
+<p>GeDefense may inspect installed-application metadata, version and signing information, declared and granted permissions and security-relevant package changes for local antivirus and XDR analysis. Initial background package reconciliation is not performed on a fresh installation until setup has been explicitly completed.</p>
+<p>GeDefense does not upload the installed-app inventory to VisionGaiaTechnology.</p>
+<h2>File scanning</h2>
+<p>When the user grants Android all-files access, GeDefense may inspect shared-storage files for local malware analysis. The scanner is read-only. It does not execute, upload, rename, delete or quarantine scanned files. Android application-private sandboxes remain outside this access.</p>
+<h2>Usage access and optional location</h2>
+<p>Usage access is used locally to improve app and traffic attribution. Optional coarse location is used only where Android network or passive last-known information is available and is not implemented as continuous background location tracking.</p>
+<h2>Device administration / TITAN</h2>
+<p>Device Administrator and Device Owner capabilities are used only when the user or managed-device operator explicitly provisions TITAN capabilities. Destructive actions are not automatic. Managed uninstall, wipe-related settings and managed trust-anchor installation require separate explicit operator actions in the product.</p>
+<h2>Threat-intelligence and geographic datasets</h2>
+<p>GeDefense downloads public security and geolocation datasets from configured upstream providers. These HTTPS requests do not append observed destination IPs, DNS history, package names or scanner findings. As with any Internet connection, the upstream server and intervening network may observe ordinary connection metadata such as the requesting public IP address.</p>
+<p>Runtime destinations are documented in the source repository's <code>NETWORK-EGRESS.md</code>.</p>
+<h2>Diagnostics</h2>
+<p>Diagnostics export is explicit and uses Android's Storage Access Framework. The <code>aggregate-only-v1</code> support bundle excludes package names and app labels, IP addresses, domains, file paths, signer/APK/install hashes, packet contents, Evidence payloads and XDR incident-detail text. It contains only bounded aggregate states, counters, durations and sanitized reason codes.</p>
+<p>GeDefense does not automatically upload a diagnostic bundle.</p>
+<h2>Retention and deletion</h2>
+<p>Local security state remains on the device until it is replaced by bounded newer state, reset through a product control where available, or removed with the app. GeDefense does not maintain a VGT cloud account containing a copy of local traffic or scanner history.</p>
+<p>Revoking the product VPN disclosure stops VPN protection and removes the authenticated local disclosure decision. Uninstalling GeDefense removes ordinary application-local state according to Android platform behavior; application backup is disabled.</p>
+<h2>External links</h2>
+<p>The optional Support VGT screen only opens its fixed external destination after an explicit user action. Once the user leaves GeDefense, the destination service's own privacy terms apply.</p>
+<h2>Security and privacy reports</h2>
+<p class="notice">Do not place sensitive device information, packet payloads, private keys or personal files in a public issue. Use the repository's private vulnerability-reporting channel when available.</p>
+<h2>Publication</h2>
+<p>This page is the web-renderable counterpart of the canonical <code>PRIVACY.md</code> shipped with the source. The repository copy remains the reviewable source text for each tagged release.</p>
+</article></main></body></html>
