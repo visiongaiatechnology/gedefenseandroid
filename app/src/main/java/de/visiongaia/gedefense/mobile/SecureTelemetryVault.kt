@@ -42,6 +42,7 @@ enum class VaultDomain(
     val wrappedKeyVersion: Int = Int.MAX_VALUE,
     val derivedKeyVersion: Int = Int.MAX_VALUE,
     val persistentKeyVersion: Int = Int.MAX_VALUE,
+    val infrastructureOnly: Boolean = false,
 ) {
     VPN_DISCLOSURE_LEGACY("vpn-disclosure", legacyOnly = true),
     VPN_DISCLOSURE("vpn-disclosure-receipt", activeKeyVersion = 1, persistentKeyVersion = 1),
@@ -58,6 +59,7 @@ enum class VaultDomain(
     SCANNER_APPS("scanner-apps", activeKeyVersion = 3, derivedKeyVersion = 2, persistentKeyVersion = 3),
     WIREGUARD_PROFILE("wireguard-profile", activeKeyVersion = 2, derivedKeyVersion = 1, persistentKeyVersion = 2),
     EVIDENCE("evidence", activeKeyVersion = 5, preferStrongBox = false, hotPathWrapped = true, wrappedKeyVersion = 3, derivedKeyVersion = 4, persistentKeyVersion = 5),
+    SECURITY_ROOT("security-root", activeKeyVersion = 1, preferStrongBox = false, persistentKeyVersion = 1, infrastructureOnly = true),
 }
 
 enum class SecureVaultFailureKind {
@@ -227,7 +229,8 @@ object SecureTelemetryVault {
         )
     }
 
-    fun activeStatuses(): List<VaultProtectionStatus> = VaultDomain.entries.filterNot { it.legacyOnly }.map(::protectionStatus)
+    fun activeStatuses(): List<VaultProtectionStatus> =
+        VaultDomain.entries.filterNot { it.legacyOnly || it.infrastructureOnly }.map(::protectionStatus)
 
     fun hotPathHmacKey(domain: VaultDomain): SecretKey {
         val version = domain.activeKeyVersion

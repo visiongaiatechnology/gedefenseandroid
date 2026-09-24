@@ -863,6 +863,12 @@
     <string name="diagnostics_state_review">ПРОВЕРИТЬ</string>
     <string name="diagnostics_runtime_summary">Bootstrap %1$s · Целостность %2$s · Evidence %3$s · Trust stores %4$s · GaiaNet %5$s</string>
     <string name="diagnostics_resilience_summary">VPN %1$s · Kill switch %2$s · Восстановления %3$d · Самотест %4$s (%5$d мс) · Батарея %6$s</string>
+    <string name="diagnostics_threat_self_test_title">Самотест политики угроз</string>
+    <string name="diagnostics_threat_self_test_summary">Проверочный адрес %1$s · Источники %2$s · Причина %3$s
+Проверяет загруженный ThreatIndex → ROUTE_BLOCK → покрытие маршрутом → сериализацию GDTI. Сетевое соединение не открывается; захват TUN этим тестом не проверяется.</string>
+    <string name="diagnostics_threat_self_test_action">Проверить политику угроз</string>
+    <string name="diagnostics_threat_self_test_started">Самотест политики угроз запущен.</string>
+    <string name="diagnostics_threat_self_test_unavailable">Для самотеста блокировки требуется активный режим Full Flow.</string>
     <string name="diagnostics_android_title">Состояние приложения Android</string>
     <string name="diagnostics_android_body">Открывает сведения Android о приложении для проверки батареи, разрешений и фонового режима. Настройки автоматически не изменяются.</string>
     <string name="diagnostics_android_action">Открыть сведения о приложении</string>
@@ -1061,10 +1067,17 @@
     <string name="wireguard_mode_title">Режим выхода</string>
     <string name="wireguard_mode_body">Прямой режим использует штатный выход GaiaNet. WireGuard направляет разрешённые пакеты через ваш пир. Строгий режим дополнительно требует Android VPN lockdown до запуска защиты.</string>
     <string name="wireguard_profile_title">Профиль WireGuard</string>
-    <string name="wireguard_profile_body">Импортируйте стандартный single-peer .conf. Ключи хранятся только в зашифрованном хранилище GeDefense и больше не отображаются. Требуется IPv4 full-tunnel (0.0.0.0/0).</string>
+    <string name="wireguard_profile_body">Импортируйте обычный single-peer профиль вставкой текста, из .conf-файла или локальным QR-сканированием. Ключи сохраняются только в зашифрованном хранилище GeDefense и затем не отображаются. Требуется IPv4 full-tunnel (0.0.0.0/0).</string>
     <string name="wireguard_config_hint">[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …\nAllowedIPs = 0.0.0.0/0</string>
     <string name="wireguard_import_paste">Импортировать вставленную конфигурацию</string>
     <string name="wireguard_import_file">Импортировать .conf</string>
+    <string name="wireguard_import_qr">Сканировать QR WireGuard</string>
+    <string name="wireguard_qr_prompt">Наведите камеру на QR-код конфигурации WireGuard.</string>
+    <string name="wireguard_qr_scanner_failed">Не удалось открыть локальный QR-сканер.</string>
+    <string name="wireguard_qr_camera_unavailable">На этом устройстве нет камеры для импорта QR.</string>
+    <string name="wireguard_import_reason_file">выбранный файл не удалось прочитать как ограниченную UTF-8 конфигурацию WireGuard</string>
+    <string name="wireguard_import_reason_qr">QR-код не содержит читаемой конфигурации WireGuard</string>
+    <string name="wireguard_import_reason_invalid">недопустимая конфигурация</string>
     <string name="wireguard_clear_profile">Удалить сохранённый профиль</string>
     <string name="wireguard_security_title">Модель fail-closed</string>
     <string name="wireguard_security_body">GaiaNet проверяет threat-policy до WireGuard. В режиме WireGuard прямого fallback нет. Строгий режим также требует Android Always-on VPN lockdown. Трафик от пира допускается только для ранее замеченных исходящих потоков.</string>
@@ -1108,4 +1121,26 @@
     <string name="scanner_install_guard_stage_deep">Глубокая проверка</string>
     <string name="scanner_install_guard_active_body">%1$s · %2$s</string>
     <string name="live_policy_refresh_failed_stopped">Политика сохранена, но активный VPN не удалось обновить. Защита остановлена, чтобы не применять устаревшие правила.</string>
+
+    <string name="update_experience_title">GeDefense обновлён</string>
+    <string name="update_experience_subtitle">Проверьте изменения безопасности и обновите защиту для этой версии.</string>
+    <string name="update_experience_version">Версия %1$s</string>
+    <string name="update_experience_whats_new">Что нового</string>
+    <string name="update_experience_threat_title">Самопроверка политики угроз</string>
+    <string name="update_experience_threat_body">Боевой путь ROUTE_BLOCK теперь можно проверять локально без внешнего тестового трафика.</string>
+    <string name="update_experience_state_title">Стабильное состояние после обновлений</string>
+    <string name="update_experience_state_body">Состояние настройки загружается до маршрутизации запуска. Integrity, Threat Intelligence, Geo и ASN используют стабильные при обновлении раздельные ключи вместо отдельных OEM HMAC-алиасов.</string>
+    <string name="update_experience_flow_title">Безопасный сценарий обновления</string>
+    <string name="update_experience_flow_body">Существующие установки остаются настроенными. После обновления GeDefense показывает только это сообщение, синхронизирует Threat Intelligence и затем проверяет защиту.</string>
+    <string name="update_experience_security_check">Обновление безопасности</string>
+    <string name="update_experience_ready">Готово к синхронизации Threat Intelligence и активации защиты.</string>
+    <string name="update_experience_sync_progress">Обновление Threat Intelligence · обработано источников: %1$d/%2$d</string>
+    <string name="update_experience_sync_failed">Не удалось обновить Threat Intelligence. Сообщение об обновлении останется активным, а защита не будет подтверждена.</string>
+    <string name="update_experience_synced_activation_pending">Threat Intelligence актуальна · загружено записей политики: %1$d · ожидается активация защиты</string>
+    <string name="update_experience_protected">Threat Intelligence актуальна · загружено записей политики: %1$d · защита уже активна</string>
+    <string name="update_experience_refresh_failed">Защита активна, но запрос на обновление политики не выполнен. Повторите попытку перед закрытием сообщения.</string>
+    <string name="update_experience_action">Обновить угрозы и включить защиту</string>
+    <string name="update_experience_action_running">Обновление Threat Intelligence…</string>
+    <string name="update_experience_action_retry">Повторить обновление безопасности</string>
+    <string name="update_experience_footer">Сообщение исчезнет только после подтверждённого перехода в защищённое состояние.</string>
 </resources>

@@ -31,7 +31,18 @@ class MainActivity : Activity(), UiActions {
         refreshPending.set(false)
         if (!isFinishing && !isDestroyed) refresh()
     }
-    private val runtimeListener: () -> Unit = { scheduleRuntimeRefresh() }
+    private val runtimeListener: () -> Unit = {
+        if (::runtime.isInitialized && runtime.state.isVpnActive()) runtime.setup.completePendingUpdateAfterProtection()
+        scheduleRuntimeRefresh()
+    }
+    private val setupListener: () -> Unit = {
+        uiHandler.post {
+            if (!isFinishing && !isDestroyed) {
+                routeStartupExperienceIfReady()
+                scheduleRuntimeRefresh()
+            }
+        }
+    }
     private lateinit var runtime: AppRuntime
     private lateinit var contentHost: FrameLayout
     private lateinit var safeShell: LinearLayout
@@ -43,6 +54,7 @@ class MainActivity : Activity(), UiActions {
     private lateinit var systemHub: SystemHubScreen
     private lateinit var screens: List<View>
     private var selectedScreen = 0
+    private var startupExperienceRouted = false
     private var syncing = false
     private var verifying = false
 
@@ -55,15 +67,10 @@ class MainActivity : Activity(), UiActions {
             return
         }
         runtime = initialized
+        startupExperienceRouted = savedInstanceState?.getBoolean(STATE_STARTUP_EXPERIENCE_ROUTED, false) ?: false
         configureSystemBars()
         setContentView(buildUi())
-        if (savedInstanceState == null && !runtime.setup.isWizardCompleted()) {
-            startActivityForResult(
-                Intent(this, SetupWizardActivity::class.java)
-                    .putExtra(SetupWizardActivity.EXTRA_FIRST_RUN, true),
-                SETUP_REQUEST,
-            )
-        }
+        routeStartupExperienceIfReady()
         refresh()
     }
 
@@ -71,6 +78,8 @@ class MainActivity : Activity(), UiActions {
         super.onStart()
         if (!::runtime.isInitialized) return
         runtime.addStateListener(runtimeListener)
+        runtime.setup.addStateListener(setupListener)
+        routeStartupExperienceIfReady()
     }
 
     override fun onResume() {
@@ -82,6 +91,7 @@ class MainActivity : Activity(), UiActions {
         }
         runtime.refreshOriginLocationAsync { runOnUiThread { if (!isFinishing && !isDestroyed) refresh() } }
         if (runtime.state.isVpnActive()) {
+            runtime.setup.completePendingUpdateAfterProtection()
             try {
                 startService(Intent(this, GeDefenseVpnService::class.java).setAction(GeDefenseVpnService.ACTION_RESILIENCE_PROBE))
             } catch (error: RuntimeException) { RuntimeFailureLog.nonCritical("main-activity", error) }
@@ -90,10 +100,36 @@ class MainActivity : Activity(), UiActions {
     }
 
     override fun onStop() {
-        if (::runtime.isInitialized) runtime.removeStateListener(runtimeListener)
+        if (::runtime.isInitialized) {
+            runtime.removeStateListener(runtimeListener)
+            runtime.setup.removeStateListener(setupListener)
+        }
         uiHandler.removeCallbacks(runtimeRefreshRunnable)
         refreshPending.set(false)
         super.onStop()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(STATE_STARTUP_EXPERIENCE_ROUTED, startupExperienceRouted)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun routeStartupExperienceIfReady() {
+        if (startupExperienceRouted || !::runtime.isInitialized) return
+        val setup = runtime.setup
+        if (!setup.isPreferenceStateLoaded()) return
+        startupExperienceRouted = true
+        when {
+            !setup.isWizardCompleted() -> startActivityForResult(
+                Intent(this, SetupWizardActivity::class.java)
+                    .putExtra(SetupWizardActivity.EXTRA_FIRST_RUN, true),
+                SETUP_REQUEST,
+            )
+            setup.shouldShowUpdateExperience() -> startActivityForResult(
+                Intent(this, UpdateExperienceActivity::class.java),
+                UPDATE_REQUEST,
+            )
+        }
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -128,6 +164,8 @@ class MainActivity : Activity(), UiActions {
         when {
             requestCode == SETUP_REQUEST && resultCode == RESULT_OK &&
                 data?.getBooleanExtra(SetupWizardActivity.EXTRA_REQUEST_PROTECTION_ACTIVATION, false) == true -> requestVpn()
+            requestCode == UPDATE_REQUEST && resultCode == RESULT_OK &&
+                data?.getBooleanExtra(UpdateExperienceActivity.EXTRA_REQUEST_PROTECTION_ACTIVATION, false) == true -> requestVpn()
             requestCode == VPN_DISCLOSURE_REQUEST && resultCode == RESULT_OK -> requestVpn()
             requestCode == VPN_REQUEST && resultCode == RESULT_OK -> startProtection()
         }
@@ -657,6 +695,8 @@ class MainActivity : Activity(), UiActions {
         private const val VPN_REQUEST = 4701
         private const val VPN_DISCLOSURE_REQUEST = 4702
         private const val SETUP_REQUEST = 4703
+        private const val UPDATE_REQUEST = 1005
+        private const val STATE_STARTUP_EXPERIENCE_ROUTED = "main_startup_experience_routed"
         private const val NOTIFICATION_PERMISSION_REQUEST = 77
         private const val MAP_LOCATION_PERMISSION_REQUEST = 78
         private const val UI_REFRESH_COALESCE_MS = 120L

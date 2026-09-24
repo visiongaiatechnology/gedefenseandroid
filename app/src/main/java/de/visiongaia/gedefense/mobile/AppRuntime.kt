@@ -18,6 +18,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 class AppRuntime private constructor(private val application: Application) {
@@ -59,15 +60,15 @@ class AppRuntime private constructor(private val application: Application) {
     val feeds = ThreatIntelRepository(
         application,
         threatIndex,
-    ) { AndroidSecrets.hmacSha256OrNull("vgt.gedefense.mobile.threatintel.hmac.v1") }
+    ) { StableSecurityKeys.hmacOrNull("threat-intel") }
     val integrityGuardian = IntegrityGuardian(
         application,
-    ) { AndroidSecrets.hmacSha256OrNull("vgt.gedefense.mobile.integrity.hmac.v1") }
+    ) { StableSecurityKeys.hmacOrNull("integrity-baseline") }
     val geoCountry by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        GeoCountryRepository(application) { AndroidSecrets.hmacSha256OrNull("vgt.gedefense.mobile.geo-country.hmac.v1") }
+        GeoCountryRepository(application) { StableSecurityKeys.hmacOrNull("geo-country") }
     }
     val asnEvidence by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        AsnEvidenceRepository(application) { AndroidSecrets.hmacSha256OrNull("vgt.gedefense.mobile.asn-evidence.hmac.v1") }
+        AsnEvidenceRepository(application) { StableSecurityKeys.hmacOrNull("asn-evidence") }
     }
     val fullFlowAnalytics by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { FullFlowAnalytics(application) }
     val originLocator by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { LocalOriginLocator(application) }
@@ -100,6 +101,7 @@ class AppRuntime private constructor(private val application: Application) {
     val trafficSnapshot = AtomicReference(TrafficUsageSnapshot.idle())
     val hardeningSnapshot = AtomicReference(HardeningSnapshot.pending())
     val networkDiscoverySnapshot = AtomicReference(NetworkDiscoverySnapshot.idle())
+    val threatEnforcementSelfTest = AtomicReference(ThreatEnforcementSelfTestSnapshot.idle())
 
     private val listeners = CopyOnWriteArraySet<() -> Unit>()
     private val bootstrapComplete = CountDownLatch(CRITICAL_BOOTSTRAP_STAGES)
@@ -121,8 +123,92 @@ class AppRuntime private constructor(private val application: Application) {
     private val trafficQueryRunning = AtomicBoolean(false)
     private val networkDiscoveryRunning = AtomicBoolean(false)
     private val networkDiscoveryCancel = AtomicBoolean(false)
+    private val threatSelfTestSequence = AtomicInteger(0)
 
     fun executeBackground(name: String, action: () -> Unit): Boolean = submitWorker(name, action)
+
+    fun runThreatEnforcementSelfTest(): Boolean {
+        if (!state.isVpnActive() || state.protectionMode() != ProtectionMode.FULL_FLOW_BETA || state.lastVpnStatus() != "FULL_GUARDED") {
+            recordThreatSelfTestImmediateFailure("full_flow_not_guarded")
+            return false
+        }
+        while (true) {
+            val current = threatEnforcementSelfTest.get()
+            if (current.state == "RUNNING") return false
+            val sequence = threatSelfTestSequence.updateAndGet { previous -> if (previous >= 255) 1 else previous + 1 }
+            val started = ThreatEnforcementSelfTestSnapshot(
+                state = "RUNNING",
+                sequence = sequence,
+                startedAtMillis = System.currentTimeMillis(),
+                completedAtMillis = 0L,
+                target = null,
+                feeds = emptyList(),
+                reason = null,
+            )
+            if (!threatEnforcementSelfTest.compareAndSet(current, started)) continue
+            notifyStateChanged()
+            if (!submitWorker("threat-policy-self-test") { executeThreatPolicySelfTest(sequence) }) {
+                completeThreatSelfTest(sequence, null, emptyList(), "worker_queue_busy")
+                return false
+            }
+            return true
+        }
+    }
+
+    private fun executeThreatPolicySelfTest(sequence: Int) {
+        val index = threatIndex.get()
+        var target: String? = null
+        var feedIds: List<String> = emptyList()
+        val reason = when {
+            index.count <= 0 -> "policy_empty"
+            index.routeOverflow -> "route_policy_overflow"
+            index.routePrefixes.isEmpty() -> "no_block_routes"
+            else -> {
+                val route = index.routePrefixes.first()
+                val address = route.toInetAddress().hostAddress ?: return completeThreatSelfTest(sequence, null, emptyList(), "route_address_unavailable")
+                target = address
+                val match = index.match(address)
+                feedIds = match?.blockingFeeds?.map { it.id }?.take(THREAT_SELF_TEST_MAX_FEEDS).orEmpty()
+                when {
+                    match == null -> "route_match_missing"
+                    !match.hasBlockingSignal -> "block_authority_missing"
+                    !index.routePrefixes.any { it.contains(match.address) } -> "route_coverage_missing"
+                    !NativeGaiaNet.validateThreatPolicySnapshot(index, application.cacheDir) -> "policy_serialization_failed"
+                    else -> "policy_index_route_serialization_ok"
+                }
+            }
+        }
+        completeThreatSelfTest(sequence, target, feedIds, reason)
+    }
+
+    private fun completeThreatSelfTest(sequence: Int, target: String?, feeds: List<String>, reason: String) {
+        while (true) {
+            val current = threatEnforcementSelfTest.get()
+            if (current.state != "RUNNING" || current.sequence != sequence) return
+            val completed = current.copy(
+                state = if (reason == "policy_index_route_serialization_ok") "PASS" else "FAIL",
+                completedAtMillis = System.currentTimeMillis(),
+                target = target?.take(80),
+                feeds = feeds.take(THREAT_SELF_TEST_MAX_FEEDS),
+                reason = reason.take(64),
+            )
+            if (threatEnforcementSelfTest.compareAndSet(current, completed)) {
+                notifyStateChanged()
+                return
+            }
+        }
+    }
+
+    private fun recordThreatSelfTestImmediateFailure(reason: String) {
+        threatEnforcementSelfTest.set(
+            ThreatEnforcementSelfTestSnapshot.idle().copy(
+                state = "FAIL",
+                completedAtMillis = System.currentTimeMillis(),
+                reason = reason.take(64),
+            ),
+        )
+        notifyStateChanged()
+    }
 
     internal fun recordXdrFailure(operation: String, error: Throwable) {
         val safeOperation = sanitizeFailureCode(operation)
@@ -1061,6 +1147,7 @@ class AppRuntime private constructor(private val application: Application) {
         private const val XDR_TRUST_BOOTSTRAP_STAGES = 6
         private const val SECONDARY_TRUST_BOOTSTRAP_TIMEOUT_MS = 30_000L
         private const val ANALYSIS_RESTORE_TIMEOUT_MS = 8_000L
+        private const val THREAT_SELF_TEST_MAX_FEEDS = 9
         private const val RUNTIME_BOOTSTRAP_DEADLINE_MS = 12_000L
         private const val READINESS_QUEUE_CAPACITY = 16
         private const val DIRECT_GET_TIMEOUT_MS = 15_000L

@@ -43,3 +43,10 @@ GeDefense requests only coarse location, not fine or background location. The si
 ## Foreground service / special use
 
 The foreground VPN service exists to keep user-enabled device network protection visible and operating under Android's service lifecycle rules. GeDefense shows a persistent protection notification while the relevant foreground protection service is active.
+
+
+## CAMERA
+
+**Purpose:** user-initiated local WireGuard QR profile import.
+
+Camera access is requested only when the user explicitly starts the WireGuard QR scanner. QR decoding runs locally inside the GeDefense application using pinned vendored scanner code. Captured frames, decoded QR payloads and WireGuard keys are not uploaded to VisionGaiaTechnology, Google Play Services or an external scanner application. The scanner activity uses `FLAG_SECURE` and the decoded text is immediately passed to the same bounded WireGuard parser used by paste/file import.

@@ -863,6 +863,12 @@ Policy-Fingerprint: %3$s…</string>
     <string name="diagnostics_state_review">PRÜFEN</string>
     <string name="diagnostics_runtime_summary">Bootstrap %1$s · Integrität %2$s · Evidence %3$s · Trust-Stores %4$s · GaiaNet %5$s</string>
     <string name="diagnostics_resilience_summary">VPN %1$s · Kill Switch %2$s · Recoveries %3$d · Self-Test %4$s (%5$d ms) · Akku-Bereitschaft %6$s</string>
+    <string name="diagnostics_threat_self_test_title">Threat-Policy-Selbsttest</string>
+    <string name="diagnostics_threat_self_test_summary">Prüfziel %1$s · Feeds %2$s · Grund %3$s
+Prüft geladenen ThreatIndex → ROUTE_BLOCK-Match → Routenabdeckung → GDTI-Serialisierung. Es wird keine Netzwerkverbindung geöffnet; TUN-Erfassung ist nicht Teil dieses Selbsttests.</string>
+    <string name="diagnostics_threat_self_test_action">Threat-Policy testen</string>
+    <string name="diagnostics_threat_self_test_started">Threat-Policy-Selbsttest gestartet.</string>
+    <string name="diagnostics_threat_self_test_unavailable">Der Threat-Selbsttest benötigt aktiven Full-Flow-Schutz.</string>
     <string name="diagnostics_android_title">Android-App-Zustand</string>
     <string name="diagnostics_android_body">Öffnet die Android-App-Details zur Prüfung von Akku-, Berechtigungs- und Hintergrundstatus. Es wird keine Einstellung automatisch geändert.</string>
     <string name="diagnostics_android_action">App-Details öffnen</string>
@@ -1055,10 +1061,17 @@ Policy-Fingerprint: %3$s…</string>
     <string name="wireguard_mode_title">Egress-Modus</string>
     <string name="wireguard_mode_body">Direkt nutzt den nativen GaiaNet-Egress. WireGuard leitet erlaubte Pakete durch deinen Peer. Strikt verlangt zusätzlich Android-VPN-Lockdown, bevor der Schutz starten darf.</string>
     <string name="wireguard_profile_title">WireGuard-Profil</string>
-    <string name="wireguard_profile_body">Importiere eine normale Single-Peer-.conf. Schlüssel werden ausschließlich im verschlüsselten GeDefense-Vault gespeichert und danach nicht mehr angezeigt. IPv4-Full-Tunnel (0.0.0.0/0) ist Pflicht.</string>
+    <string name="wireguard_profile_body">Importiere ein normales Single-Peer-Profil per Einfügen, .conf-Datei oder lokalem QR-Scan. Schlüssel werden ausschließlich im verschlüsselten GeDefense-Vault gespeichert und danach nicht mehr angezeigt. IPv4-Full-Tunnel (0.0.0.0/0) ist Pflicht.</string>
     <string name="wireguard_config_hint">[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …\nAllowedIPs = 0.0.0.0/0</string>
     <string name="wireguard_import_paste">Eingefügte Konfiguration importieren</string>
     <string name="wireguard_import_file">.conf-Datei importieren</string>
+    <string name="wireguard_import_qr">WireGuard-QR scannen</string>
+    <string name="wireguard_qr_prompt">Richte die Kamera auf den QR-Code der WireGuard-Konfiguration.</string>
+    <string name="wireguard_qr_scanner_failed">Der lokale QR-Scanner konnte nicht geöffnet werden.</string>
+    <string name="wireguard_qr_camera_unavailable">Auf diesem Gerät ist keine Kamera für den QR-Import verfügbar.</string>
+    <string name="wireguard_import_reason_file">die ausgewählte Datei konnte nicht als begrenzte UTF-8-WireGuard-Konfiguration gelesen werden</string>
+    <string name="wireguard_import_reason_qr">der QR-Code enthält keine lesbare WireGuard-Konfiguration</string>
+    <string name="wireguard_import_reason_invalid">ungültige Konfiguration</string>
     <string name="wireguard_clear_profile">Gespeichertes Profil löschen</string>
     <string name="wireguard_security_title">Fail-closed-Sicherheitsmodell</string>
     <string name="wireguard_security_body">GaiaNet prüft die Threat-Policy vor WireGuard. Im WireGuard-Modus gibt es keinen direkten Fallback. Der strikte Modus verlangt zusätzlich Android Always-on-VPN-Lockdown. Peer-Traffic wird nur für zuvor ausgehend beobachtete Flows zugelassen.</string>
@@ -1100,4 +1113,26 @@ Policy-Fingerprint: %3$s…</string>
     <string name="scanner_install_guard_stage_deep">Tiefenprüfung</string>
     <string name="scanner_install_guard_active_body">%1$s · %2$s</string>
     <string name="live_policy_refresh_failed_stopped">Die Richtlinie wurde gespeichert, aber der laufende VPN-Schutz konnte nicht aktualisiert werden. Der Schutz wurde beendet, damit keine veralteten Regeln aktiv bleiben.</string>
+
+    <string name="update_experience_title">GeDefense wurde aktualisiert</string>
+    <string name="update_experience_subtitle">Prüfe die Sicherheitsänderungen und aktualisiere den Schutz für diese Version.</string>
+    <string name="update_experience_version">Version %1$s</string>
+    <string name="update_experience_whats_new">Was ist neu?</string>
+    <string name="update_experience_threat_title">Threat-Policy-Self-Test</string>
+    <string name="update_experience_threat_body">Der produktive ROUTE_BLOCK-Pfad kann jetzt lokal geprüft werden, ohne externen Testverkehr zu erzeugen.</string>
+    <string name="update_experience_state_title">Update-stabiler Sicherheitszustand</string>
+    <string name="update_experience_state_body">Die Einrichtung wird vor dem Routing aus dem persistenten Zustand geladen. Integrity, Threat Intelligence, Geo und ASN nutzen update-stabile, getrennt abgeleitete Schlüssel statt eigener OEM-HMAC-Aliase.</string>
+    <string name="update_experience_flow_title">Sauberer Update-Flow</string>
+    <string name="update_experience_flow_body">Bestehende Installationen bleiben eingerichtet. Nach dem Update zeigt GeDefense nur diese Aktualisierung, synchronisiert Threat Intelligence und verifiziert anschließend den Schutz.</string>
+    <string name="update_experience_security_check">Sicherheitsaktualisierung</string>
+    <string name="update_experience_ready">Bereit, aktuelle Threat Intelligence zu synchronisieren und den Schutz zu aktivieren.</string>
+    <string name="update_experience_sync_progress">Threat Intelligence wird aktualisiert · %1$d/%2$d Quellen verarbeitet</string>
+    <string name="update_experience_sync_failed">Das Threat-Intelligence-Update ist fehlgeschlagen. Die Update-Meldung bleibt aktiv und der Schutz wird nicht als bestätigt markiert.</string>
+    <string name="update_experience_synced_activation_pending">Threat Intelligence ist aktuell · %1$d Policy-Einträge geladen · Schutzaktivierung ausstehend</string>
+    <string name="update_experience_protected">Threat Intelligence ist aktuell · %1$d Policy-Einträge geladen · Schutz bereits aktiv</string>
+    <string name="update_experience_refresh_failed">Der Schutz ist aktiv, aber die Policy-Aktualisierung konnte nicht angefordert werden. Vor dem Schließen erneut versuchen.</string>
+    <string name="update_experience_action">Threats aktualisieren &amp; Schutz aktivieren</string>
+    <string name="update_experience_action_running">Threat Intelligence wird aktualisiert…</string>
+    <string name="update_experience_action_retry">Sicherheitsaktualisierung erneut versuchen</string>
+    <string name="update_experience_footer">Die Meldung verschwindet erst, wenn die Sicherheitsaktualisierung einen verifizierten Schutzzustand erreicht hat.</string>
 </resources>

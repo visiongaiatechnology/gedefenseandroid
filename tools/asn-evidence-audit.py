@@ -18,9 +18,9 @@ def require(ok: bool, message: str) -> None:
     if not ok:
         failures.append(message)
 
-require(version == '0.27.8-beta.6', 'VERSION changed during ASN evidence block')
-require(version_code == '55', 'VERSION_CODE changed during ASN evidence block')
-require('versionCode = 55' in build and 'versionName = "0.27.8-beta.6"' in build, 'Gradle release metadata changed')
+require(re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?', version) is not None, 'VERSION is not valid release metadata')
+require(version_code.isdigit() and int(version_code) > 0, 'VERSION_CODE is not valid release metadata')
+require(f'versionCode = {version_code}' in build and f'versionName = "{version}"' in build, 'Gradle release metadata does not match VERSION/VERSION_CODE')
 
 for marker in (
     'SOURCE_ID = "sapics-ip-location-db/iptoasn-asn"',

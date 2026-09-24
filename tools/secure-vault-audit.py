@@ -327,6 +327,6 @@ if active_domain_count != 12:
     raise SystemExit(f'SECURE_VAULT_FAIL domain_count={active_domain_count}')
 if 'VPN_DISCLOSURE_LEGACY("vpn-disclosure", legacyOnly = true)' not in vault:
     raise SystemExit('SECURE_VAULT_FAIL legacy_disclosure_migration_domain_missing')
-if 'filterNot { it.legacyOnly }' not in vault:
-    raise SystemExit('SECURE_VAULT_FAIL legacy_domain_exposed_as_active')
+if 'filterNot { it.legacyOnly || it.infrastructureOnly }' not in vault:
+    raise SystemExit('SECURE_VAULT_FAIL legacy_or_infrastructure_domain_exposed_as_active')
 print(f'SECURE_TELEMETRY_VAULT_PASS domains={active_domain_count} active_keys=persistent-kek-wrapped-domain-keysets evidence=encrypted-v3 pqc=ml-dsa-87-conditional consent=update-stable-hmac-receipt')

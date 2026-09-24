@@ -154,9 +154,15 @@ bash tools/core-check.sh
 python3 tools/i18n-audit.py
 python3 tools/network-egress-audit.py
 python3 tools/onboarding-audit.py
+python3 tools/update-experience-audit.py
 python3 tools/secure-vault-audit.py
+python3 tools/oem-hmac-continuity-audit.py
 python3 tools/full-flow-availability-audit.py
 python3 tools/wireguard-audit.py
+bash tools/wireguard-parser-check.sh
+python3 tools/wireguard-import-surface-audit.py
+python3 tools/sbom-audit.py
+python3 tools/asn-evidence-audit.py
 python3 tools/privacy-shield-audit.py
 python3 tools/install-guard-audit.py
 bash tools/install-guard-policy-check.sh

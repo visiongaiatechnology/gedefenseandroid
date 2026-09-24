@@ -3,7 +3,8 @@
 <p align="center"><strong>本地优先的 Android 终端安全、网络防御与 XDR。</strong><br>由 VisionGaiaTechnology 构建，面向希望安全遥测尽可能留在设备本地的环境。</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md"><strong>简体中文</strong></a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/version-0.27.8--beta.6-D8A928?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/version-0.27.8--beta.9-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-58-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/privacy-local--first-06B6D4?style=flat-square" />
@@ -34,7 +35,7 @@ GeDefense Mobile 是一套原生 Android 安全平台，将本地 VPN enforcemen
 | Evidence | 加密、认证、本地 evidence ledger 与有界恢复语义 |
 | Resilience | 有界自愈、健康检查、fail-closed 降级 |
 | TITAN | 可选 Device Owner policy plane，用于受管设备加固与 lockdown |
-| Diagnostics | 仅由用户主动导出的 aggregate-only 支持包，不自动上传 |
+| 诊断 | 仅手动导出的 aggregate-only 支持包，以及不产生网络外发的威胁策略自检 |
 
 ## 隐私与 Telemetry Shield
 
@@ -91,7 +92,7 @@ Android host 负责 lifecycle、policy、Keystore 访问与 UI state。GaiaNet �
 
 需要 JDK 17、Gradle 8.7、Android Platform/Build Tools 36、NDK `27.2.12479018`、Go 1.26.8。
 
-`app` 和 `core` 的 **Android 第三方 runtime library 数量为 0**。GaiaNet 使用少量固定版本、仓库内 vendored 的 Go dependencies。
+`:app` 仅包含**两个固定版本、仓库内 vendored 的 Apache-2.0 二维码扫描构件**（ZXing Android Embedded + ZXing Core），用于本地 WireGuard 二维码导入；`:core` 的 Android 第三方 runtime library 数量仍为 0。GaiaNet 使用少量固定版本、仓库内 vendored 的 Go dependencies。
 
 完整 readiness gate：
 
@@ -110,7 +111,7 @@ bash tools/release-readiness.sh
 | Русский | [`Master Architecture - RU`](docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf) |
 | 简体中文 | [`Master Architecture - ZH-CN`](docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf) |
 
-> Dossier 记录 VC55 架构 baseline。之后在相同 VersionCode 下继续进行了 hardening。当前实现状态应优先参考 `TOOLCHAINS.lock`、`SECURITY.md`、`CHANGELOG.md` 与源码。
+> Dossier 记录 VC55 架构 baseline。当前源码版本为 **0.27.8-beta.9 / VC58**，并新增了 OEM-HMAC 恢复连续性加固、不产生网络外发的威胁策略自检、重新设计的事务型更新界面以及三种 WireGuard 导入方式（文本、文件与本地二维码扫描）。该自检验证已加载的 `ThreatIndex`、阻断权限、路由覆盖以及启动 GaiaNet 所用的同一 GDTI 序列化路径；第三方应用的 TUN 捕获仍需在真实设备上单独验证。当前实现状态应优先参考 `TOOLCHAINS.lock`、`SECURITY.md`、`CHANGELOG.md` 与源码。
 
 ## 文档
 

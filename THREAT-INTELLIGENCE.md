@@ -72,3 +72,20 @@ Notable upstream handling:
 - IPsum: fetched from `stamparm/ipsum`; GeDefense uses score >= 3 only for correlation.
 - FireHOL Level 1: treated as block-authoritative only after GeDefense rejects private, CGNAT, link-local, multicast, documentation and other non-public prefixes; the direct upstream Level 1 file is fetched rather than the slower GitHub mirror.
 - Tor exit nodes: fetched from the Tor Project bulk exit list; context only, never automatically treated as malicious.
+
+
+## Threat Policy Self-Test
+
+`0.27.8-beta.7 / VC56` includes a deterministic diagnostics self-test for the **loaded threat-policy snapshot**. The test deliberately performs **no network egress** and never contacts a threat-listed address.
+
+While Full Flow is `FULL_GUARDED`, Android selects a real `ROUTE_BLOCK` route from the immutable `ThreatIndex` that is also supplied to GaiaNet. It then:
+
+1. resolves the selected address through the production Kotlin `ThreatIndex.match()` path;
+2. verifies that at least one matched feed has blocking authority;
+3. verifies that the matched address remains covered by the compiled route set;
+4. serializes the same immutable index through `ThreatPolicyBinary`, the exact GDTI writer used during GaiaNet startup; and
+5. validates the GDTI ABI-v2 header, record count and `fullPolicySha256` fingerprint locally.
+
+The self-test does **not** increment real block counters, create synthetic threat XDR/Evidence records, open a socket, mutate the active transport, or claim to validate third-party-app/TUN capture. This is intentional: GeDefense's own UID is excluded from Direct Full Flow to prevent its native upstream sockets from recursively entering the VPN. Real TUN capture and packet enforcement therefore remain a separate device-level validation boundary.
+
+A PASS means the active Android-side policy/index/route/serialization chain is coherent. If a real app flow is still not blocked or counted, investigation should move to Android VPN capture/routing, OEM behavior or runtime telemetry rather than treating the dataset as unverified.

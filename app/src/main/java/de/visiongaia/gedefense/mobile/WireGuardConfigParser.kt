@@ -17,9 +17,15 @@ internal object WireGuardConfigParser {
     private const val MAX_DNS_SERVERS = 4
     private const val MAX_ALLOWED_IPS = 64
 
+    private val edgeFormatChars = setOf('\uFEFF', '\u200B', '\u200C', '\u200D', '\u2060')
+
     fun parse(text: String): WireGuardProfile {
         require(text.length in 1..MAX_CONFIG_CHARS) { "wireguard_config_size_invalid" }
         require(text.toByteArray(StandardCharsets.UTF_8).size <= MAX_CONFIG_BYTES) { "wireguard_config_size_invalid" }
+        val normalizedText = normalizeImportedText(text)
+        require(normalizedText.isNotEmpty()) { "wireguard_config_size_invalid" }
+        require(normalizedText.length <= MAX_CONFIG_CHARS) { "wireguard_config_size_invalid" }
+        require(normalizedText.toByteArray(StandardCharsets.UTF_8).size <= MAX_CONFIG_BYTES) { "wireguard_config_size_invalid" }
         var section = ""
         var privateKey: ByteArray? = null
         val addresses = mutableListOf<WireGuardInterfaceAddress>()
@@ -35,17 +41,18 @@ internal object WireGuardConfigParser {
         var interfaceSeen = false
         var peerSeen = false
         var mtuSeen = false
+        var listenPortSeen = false
         var keepaliveSeen = false
         var lines = 0
 
         try {
-            text.lineSequence().forEach { rawLine ->
+            normalizedText.lineSequence().forEach { rawLine ->
                 lines++
                 require(lines <= MAX_LINES) { "wireguard_config_line_limit" }
-                val line = rawLine.substringBefore('#').trim()
+                val line = trimConfigWhitespace(rawLine.substringBefore('#'))
                 if (line.isEmpty()) return@forEach
                 if (line.startsWith('[') && line.endsWith(']')) {
-                    section = line.substring(1, line.length - 1).trim().lowercase()
+                    section = trimConfigWhitespace(line.substring(1, line.length - 1)).lowercase()
                     require(section == "interface" || section == "peer") { "wireguard_section_invalid" }
                     when (section) {
                         "interface" -> {
@@ -62,8 +69,8 @@ internal object WireGuardConfigParser {
                 }
                 val split = line.indexOf('=')
                 require(split in 1 until line.lastIndex) { "wireguard_line_invalid" }
-                val key = line.substring(0, split).trim().lowercase()
-                val value = line.substring(split + 1).trim()
+                val key = trimConfigWhitespace(line.substring(0, split)).lowercase()
+                val value = trimConfigWhitespace(line.substring(split + 1))
                 require(value.isNotEmpty()) { "wireguard_value_empty" }
                 when (section) {
                     "interface" -> when (key) {
@@ -75,6 +82,15 @@ internal object WireGuardConfigParser {
                             mtuSeen = true
                             mtu = value.toIntOrNull()?.takeIf { it in 1280..1420 }
                                 ?: throw IllegalArgumentException("wireguard_mtu_invalid")
+                        }
+                        "listenport" -> {
+                            require(!listenPortSeen) { "wireguard_listen_port_duplicate" }
+                            listenPortSeen = true
+                            value.toIntOrNull()?.takeIf { it in 1..65535 }
+                                ?: throw IllegalArgumentException("wireguard_listen_port_invalid")
+                            // Accepted for compatibility with standard client .conf files. GeDefense owns
+                            // the protected transport socket lifecycle, so this inbound-listen hint is not
+                            // applied to the embedded egress transport.
                         }
                         else -> throw IllegalArgumentException("wireguard_interface_key_unsupported")
                     }
@@ -126,6 +142,19 @@ internal object WireGuardConfigParser {
             throw IllegalArgumentException("wireguard_config_invalid")
         }
     }
+
+
+    private fun normalizeImportedText(text: String): String {
+        require(text.none { it == '\u0000' }) { "wireguard_config_control_char_invalid" }
+        return text
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
+            .replace('\u00A0', ' ')
+            .trim { it.isWhitespace() || it in edgeFormatChars }
+    }
+
+    private fun trimConfigWhitespace(value: String): String =
+        value.trim { it.isWhitespace() || it in edgeFormatChars }
 
     fun validateDecoded(profile: WireGuardProfile): Boolean {
         if (profile.privateKey.size != KEY_BYTES || profile.privateKey.all { it == 0.toByte() }) return false

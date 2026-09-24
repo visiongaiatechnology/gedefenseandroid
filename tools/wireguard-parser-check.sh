@@ -105,6 +105,26 @@ fun main() {
     parsed.privateKey.fill(0)
     parsed.peerPublicKey.fill(0)
 
+    val pasted = "\uFEFF" + validConfig(extraInterface = "ListenPort = 51820")
+        .replace(" = ", "\u00A0=\u00A0")
+        .replace("\n", "\r\n") + "\u200B"
+    val pastedParsed = WireGuardConfigParser.parse(pasted)
+    check(pastedParsed.endpointPort == 51820)
+    check(pastedParsed.allowedIps.single() == WireGuardAllowedIp("0.0.0.0", 0))
+    pastedParsed.privateKey.fill(0)
+    pastedParsed.peerPublicKey.fill(0)
+
+    expectReject(
+        "wg-quick script directive remains forbidden",
+        validConfig(extraInterface = "PostUp = iptables -A OUTPUT -j ACCEPT"),
+        "wireguard_interface_key_unsupported",
+    )
+    expectReject(
+        "nul control char",
+        validConfig() + "\u0000",
+        "wireguard_config_control_char_invalid",
+    )
+
     expectReject(
         "dns required",
         validConfig().lineSequence().filterNot { it.trim().startsWith("DNS") }.joinToString("\n"),
@@ -168,7 +188,7 @@ fun main() {
     restoredBadEndpoint.privateKey.fill(0)
     restoredBadEndpoint.peerPublicKey.fill(0)
 
-    println("WIREGUARD_PARSER_CHECK_PASS cases=9 mtu=true dns_fail_closed=true dual_stack=true restored_endpoint=true")
+    println("WIREGUARD_PARSER_CHECK_PASS cases=12 paste_normalized=true listen_port_compatible=true unsafe_directives_rejected=true mtu=true dns_fail_closed=true dual_stack=true restored_endpoint=true")
 }
 KOTLIN
 

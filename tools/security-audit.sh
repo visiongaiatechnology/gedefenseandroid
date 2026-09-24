@@ -28,6 +28,7 @@ python3 tools/main-thread-io-audit.py
 python3 tools/runtime-bootstrap-audit.py
 python3 tools/wireguard-audit.py
 python3 tools/privacy-shield-audit.py
+python3 tools/threat-enforcement-self-test-audit.py
 python3 tools/install-guard-audit.py
 bash tools/install-guard-policy-check.sh
 python3 tools/resilience-supervisor-audit.py

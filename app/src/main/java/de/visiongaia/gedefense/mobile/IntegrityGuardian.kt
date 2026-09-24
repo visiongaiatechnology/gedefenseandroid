@@ -48,6 +48,7 @@ class IntegrityGuardian(
         File(appContext.filesDir, "integrity/install-baseline.v1"),
         null,
         integrityKeyProvider,
+        recoveryBoundaryMillis = IntegrityKeyMigrationPolicy.updateBoundaryMillis(appContext),
     )
 
     @Throws(InterruptedException::class)

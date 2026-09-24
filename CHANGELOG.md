@@ -1,3 +1,34 @@
+## 0.27.8-beta.9 — update UI + WireGuard import usability
+
+- Version: `0.27.8-beta.9` / version code `58`.
+- Reworked the post-update experience into a spaced, safe-area-aware GeDefense layout with a compact version chip, clearer security-refresh status block, bottom action dock and an immediate loading spinner/progress state while Threat Intelligence synchronization and protection activation are running.
+- Hardened pasted WireGuard configuration normalization for UTF-8 BOM, CRLF/CR line endings, non-breaking spaces and zero-width edge characters while preserving strict rejection of unsafe wg-quick directives.
+- Accepts a validated `ListenPort` in `[Interface]` for compatibility with common exported client profiles without changing GeDefense routing authority.
+- Changed WireGuard file import to Android `ACTION_OPEN_DOCUMENT` with an openable wildcard MIME surface so `.conf` profiles remain visible even when OEM file managers expose them as `application/octet-stream` or another non-text type; content is still bounded and validated by the same parser.
+- Added fully local WireGuard QR import using pinned in-tree ZXing Android Embedded `4.3.0` and ZXing Core `3.5.3`; no Google Play Services, ML Kit, cloud decode or external scanner app receives the profile.
+- Updated the CycloneDX SBOM and dependency documentation to reflect the two vendored Apache-2.0 QR runtime artifacts.
+
+## 0.27.8-beta.8 — update-state race + OEM HMAC continuity
+
+- Version: `0.27.8-beta.8` / version code `57`.
+- Fixed an update-startup race where `MainActivity` could read the conservative `wizardCompleted=false` snapshot before persisted setup preferences finished loading, reopening onboarding after an in-place update. Startup routing is now gated on the loaded preference state and reacts asynchronously without main-thread I/O.
+- Moved active Integrity, Threat Intelligence, Geo and ASN HMAC consumers away from historical direct AndroidKeyStore aliases onto purpose-separated keys derived from an installation-stable persistent security root.
+- Added a one-release, actual-update-only integrity baseline recovery boundary for VC57. A pre-update baseline can be re-authenticated under the new stable key only when its file timestamp predates Android's package update boundary; post-update tampering is never auto-healed.
+- Added `OEM_HMAC_CONTINUITY_PASS` and strengthened the update-experience audit with a persisted-state startup race gate.
+
+## 0.27.8-beta.7 — threat-policy self-test
+
+- Version: `0.27.8-beta.7` / version code `56`.
+- Added a deterministic, no-egress **Threat Policy Self-Test** under Diagnostics.
+- The diagnostic runs only while Full Flow is guarded, selects a real `ROUTE_BLOCK` route from the immutable `ThreatIndex` that is supplied to GaiaNet, re-runs the production Kotlin matcher, verifies block authority and route coverage, and serializes the same snapshot through the exact GDTI startup writer.
+- The generated GDTI header is validated against policy ABI v2, record count and `fullPolicySha256`. No socket is opened and the active transport/session is not mutated.
+- The test deliberately does **not** increment production block metrics, write synthetic XDR/Evidence threat events or claim to validate third-party-app/TUN capture. A PASS therefore proves the loaded policy/index/serialization path, while real packet capture/enforcement remains a separate device-level gate.
+- Public documentation and release gates were synchronized to VC56.
+- Replaced version-gated onboarding completion with a monotonic setup-complete contract: once an installation has completed setup, future app versions cannot silently turn it back into first-run state.
+- Added a one-shot per-version **What’s New** experience for configured installs. Its primary action synchronizes Threat Intelligence, refreshes active policy, or requests protection activation when protection is off.
+- Update acknowledgement is transactional: Threat sync, pending activation and acknowledged version are persisted separately; the notice remains pending across cancellation/failure and is finalized only after an already-active policy refresh request or a real guarded VPN start.
+- Startup now routes exclusively through `MainActivity`, eliminating the former duplicate first-run wizard launch path.
+
 ## 0.27.8-beta.6 — embedded WireGuard / release hardening
 
 - Added optional WireGuard Layer-3 egress behind GaiaNet while GeDefense remains the sole Android `VpnService`; Strict mode requires Android Always-on lockdown and never falls back to Direct.

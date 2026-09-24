@@ -863,6 +863,12 @@
     <string name="diagnostics_state_review">检查</string>
     <string name="diagnostics_runtime_summary">Bootstrap %1$s · 完整性 %2$s · Evidence %3$s · Trust stores %4$s · GaiaNet %5$s</string>
     <string name="diagnostics_resilience_summary">VPN %1$s · Kill switch %2$s · 恢复 %3$d · 自检 %4$s（%5$d ms）· 电池状态 %6$s</string>
+    <string name="diagnostics_threat_self_test_title">威胁策略自检</string>
+    <string name="diagnostics_threat_self_test_summary">测试目标 %1$s · 情报源 %2$s · 原因 %3$s
+验证已加载的 ThreatIndex → ROUTE_BLOCK 匹配 → 路由覆盖 → GDTI 序列化。不建立网络连接；本自检不验证 TUN 捕获链路。</string>
+    <string name="diagnostics_threat_self_test_action">运行威胁策略自检</string>
+    <string name="diagnostics_threat_self_test_started">威胁策略自检已启动。</string>
+    <string name="diagnostics_threat_self_test_unavailable">威胁自检需要启用 Full Flow 保护。</string>
     <string name="diagnostics_android_title">Android 应用状态</string>
     <string name="diagnostics_android_body">打开 Android 应用详情以检查电池、权限和后台状态。不会自动更改任何设置。</string>
     <string name="diagnostics_android_action">打开应用详情</string>
@@ -1052,10 +1058,17 @@
     <string name="wireguard_mode_title">出口模式</string>
     <string name="wireguard_mode_body">直连使用 GaiaNet 原生出口。WireGuard 将允许的数据包通过你的对等端转发。严格模式还要求在启动保护前启用 Android VPN 锁定。</string>
     <string name="wireguard_profile_title">WireGuard 配置</string>
-    <string name="wireguard_profile_body">导入标准单对等端 .conf。密钥仅存储在加密的 GeDefense Vault 中，之后不会再次显示。必须包含 IPv4 全隧道 0.0.0.0/0。</string>
+    <string name="wireguard_profile_body">可通过粘贴文本、.conf 文件或本地 QR 扫描导入普通单对等端配置。密钥只保存在加密的 GeDefense Vault 中，导入后不会再次显示。必须包含 IPv4 全隧道 0.0.0.0/0。</string>
     <string name="wireguard_config_hint">[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …\nAllowedIPs = 0.0.0.0/0</string>
     <string name="wireguard_import_paste">导入粘贴的配置</string>
     <string name="wireguard_import_file">导入 .conf 文件</string>
+    <string name="wireguard_import_qr">扫描 WireGuard QR</string>
+    <string name="wireguard_qr_prompt">将摄像头对准 WireGuard 配置 QR 码。</string>
+    <string name="wireguard_qr_scanner_failed">无法打开本地 QR 扫描器。</string>
+    <string name="wireguard_qr_camera_unavailable">此设备没有可用于 QR 导入的摄像头。</string>
+    <string name="wireguard_import_reason_file">所选文件无法作为受大小限制的 UTF-8 WireGuard 配置读取</string>
+    <string name="wireguard_import_reason_qr">QR 码中没有可读取的 WireGuard 配置</string>
+    <string name="wireguard_import_reason_invalid">无效配置</string>
     <string name="wireguard_clear_profile">删除已保存配置</string>
     <string name="wireguard_security_title">Fail-closed 安全模型</string>
     <string name="wireguard_security_body">GaiaNet 在 WireGuard 之前执行威胁策略。WireGuard 模式下不允许直连回退。严格模式还要求 Android Always-on VPN 锁定。仅允许属于已观察到的出站流的对等端回包进入。</string>
@@ -1096,4 +1109,26 @@
     <string name="scanner_install_guard_stage_deep">深度扫描</string>
     <string name="scanner_install_guard_active_body">%1$s · %2$s</string>
     <string name="live_policy_refresh_failed_stopped">策略已保存，但无法刷新当前 VPN。为避免继续执行过期规则，保护已停止。</string>
+
+    <string name="update_experience_title">GeDefense 已更新</string>
+    <string name="update_experience_subtitle">查看本版本的安全变更并刷新保护状态。</string>
+    <string name="update_experience_version">版本 %1$s</string>
+    <string name="update_experience_whats_new">更新内容</string>
+    <string name="update_experience_threat_title">威胁策略自检</string>
+    <string name="update_experience_threat_body">现在可以在本地验证生产 ROUTE_BLOCK 路径，无需生成外部测试流量。</string>
+    <string name="update_experience_state_title">更新稳定的安全状态</string>
+    <string name="update_experience_state_body">启动路由前会先加载持久化设置状态。Integrity、Threat Intelligence、Geo 和 ASN 现在使用更新稳定且按用途隔离的密钥，不再各自依赖 OEM HMAC 别名。</string>
+    <string name="update_experience_flow_title">更安全的更新流程</string>
+    <string name="update_experience_flow_body">现有安装会保持已配置状态。更新后 GeDefense 只显示此刷新页面，同步 Threat Intelligence，然后验证保护状态。</string>
+    <string name="update_experience_security_check">安全刷新</string>
+    <string name="update_experience_ready">已准备好同步最新 Threat Intelligence 并激活保护。</string>
+    <string name="update_experience_sync_progress">正在更新 Threat Intelligence · 已处理 %1$d/%2$d 个来源</string>
+    <string name="update_experience_sync_failed">Threat Intelligence 更新失败。更新提示将继续保留，保护状态不会被确认。</string>
+    <string name="update_experience_synced_activation_pending">Threat Intelligence 已更新 · 已加载 %1$d 条策略记录 · 等待激活保护</string>
+    <string name="update_experience_protected">Threat Intelligence 已更新 · 已加载 %1$d 条策略记录 · 保护已激活</string>
+    <string name="update_experience_refresh_failed">保护已激活，但策略刷新请求失败。请重试后再关闭此更新提示。</string>
+    <string name="update_experience_action">更新威胁数据并激活保护</string>
+    <string name="update_experience_action_running">正在更新 Threat Intelligence…</string>
+    <string name="update_experience_action_retry">重试安全刷新</string>
+    <string name="update_experience_footer">仅当安全刷新达到已验证的保护状态后，此提示才会消失。</string>
 </resources>
