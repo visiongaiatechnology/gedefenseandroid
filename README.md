@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/gedefense-logo.png" alt="GeDefense Mobile" width="150" />
+  <img width="256" height="256" alt="GeDefense" src="https://github.com/user-attachments/assets/978d2835-c915-473d-9995-d315efaa869c" />
 </p>
 
 <h1 align="center">GeDefense Mobile</h1>
