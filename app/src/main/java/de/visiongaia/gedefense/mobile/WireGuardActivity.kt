@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.content.pm.PackageManager
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
@@ -16,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.journeyapps.barcodescanner.ScanOptions
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
@@ -33,6 +35,8 @@ class WireGuardActivity : Activity() {
     private lateinit var tunnelButton: TextView
     private lateinit var strictButton: TextView
     private lateinit var importButton: TextView
+    private lateinit var fileButton: TextView
+    private lateinit var qrButton: TextView
     private lateinit var clearButton: TextView
     private lateinit var configInput: EditText
     private val importRunning = AtomicBoolean(false)
@@ -63,11 +67,26 @@ class WireGuardActivity : Activity() {
         refresh()
     }
 
-    @Deprecated("Document picker result uses the platform Activity API")
+    @Deprecated("Document and QR scanner results use the platform Activity API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQUEST_IMPORT || resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
+        if (resultCode != RESULT_OK) return
+        when (requestCode) {
+            REQUEST_IMPORT -> importConfigFile(data?.data)
+            REQUEST_QR_IMPORT -> {
+                val format = data?.getStringExtra("SCAN_RESULT_FORMAT")
+                val text = data?.getStringExtra("SCAN_RESULT")
+                if (format != "QR_CODE" || text.isNullOrBlank()) {
+                    showImportResult(WireGuardImportResult(false, "wireguard_qr_result_invalid"))
+                    return
+                }
+                importConfigText(text, "wireguard-import-qr", clearInputOnSuccess = false)
+            }
+        }
+    }
+
+    private fun importConfigFile(uri: android.net.Uri?) {
+        if (uri == null) return
         if (!runtime.state.canMutateProtectionConfiguration()) {
             Toast.makeText(this, R.string.wireguard_stop_first, Toast.LENGTH_LONG).show()
             return
@@ -80,19 +99,14 @@ class WireGuardActivity : Activity() {
             } catch (_: Exception) {
                 null
             }
-            val result = if (text == null) WireGuardImportResult(false, "wireguard_file_read_failed") else runtime.wireGuard.importConfig(text)
-            runOnUiThread {
-                importRunning.set(false)
-                setImportBusy(false)
-                showImportResult(result)
-                refresh()
+            val result = if (text == null) {
+                WireGuardImportResult(false, "wireguard_file_read_failed")
+            } else {
+                runtime.wireGuard.importConfig(text)
             }
+            runOnUiThread { completeImport(result, clearInputOnSuccess = false) }
         }
-        if (!accepted) {
-            importRunning.set(false)
-            setImportBusy(false)
-            Toast.makeText(this, R.string.wireguard_runtime_busy, Toast.LENGTH_LONG).show()
-        }
+        if (!accepted) importWorkerRejected()
     }
 
     private fun buildUi(): View {
@@ -136,9 +150,10 @@ class WireGuardActivity : Activity() {
             setPadding(dp(14), dp(12), dp(14), dp(12))
         }
         importButton = GeDefenseUi.actionButton(this, getString(R.string.wireguard_import_paste), goldStyle = true) { importPastedConfig() }
-        val fileButton = GeDefenseUi.actionButton(this, getString(R.string.wireguard_import_file)) { openConfigPicker() }
+        fileButton = GeDefenseUi.actionButton(this, getString(R.string.wireguard_import_file)) { openConfigPicker() }
+        qrButton = GeDefenseUi.actionButton(this, getString(R.string.wireguard_import_qr)) { openQrScanner() }
         clearButton = GeDefenseUi.actionButton(this, getString(R.string.wireguard_clear_profile)) { clearProfile() }
-        rootLayout.addView(importCard(fileButton))
+        rootLayout.addView(importCard())
 
         gap(12)
         rootLayout.addView(FrameLayout(this).apply {
@@ -194,7 +209,7 @@ class WireGuardActivity : Activity() {
         }, FrameLayout.LayoutParams(-1, -2))
     }
 
-    private fun importCard(fileButton: TextView): View = FrameLayout(this).apply {
+    private fun importCard(): View = FrameLayout(this).apply {
         background = GeDefenseUi.glassPanelBackground(this@WireGuardActivity, accent = GeDefenseUi.cyan, radius = 18)
         addView(LinearLayout(this@WireGuardActivity).apply {
             orientation = LinearLayout.VERTICAL
@@ -204,6 +219,7 @@ class WireGuardActivity : Activity() {
             addView(configInput, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(13) })
             addView(importButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
             addView(fileButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            addView(qrButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             addView(clearButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         }, FrameLayout.LayoutParams(-1, -2))
     }
@@ -249,6 +265,11 @@ class WireGuardActivity : Activity() {
         styleModeButton(strictButton, mode == WireGuardEgressMode.WIREGUARD_STRICT, mutable && ready)
         importButton.isEnabled = mutable && !importRunning.get()
         importButton.alpha = if (importButton.isEnabled) 1f else 0.45f
+        fileButton.isEnabled = mutable && !importRunning.get()
+        fileButton.alpha = if (fileButton.isEnabled) 1f else 0.45f
+        val cameraAvailable = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+        qrButton.isEnabled = mutable && cameraAvailable && !importRunning.get()
+        qrButton.alpha = if (qrButton.isEnabled) 1f else 0.45f
         configInput.isEnabled = mutable && !importRunning.get()
         clearButton.isEnabled = mutable && profile.configured && !importRunning.get()
         clearButton.alpha = if (clearButton.isEnabled) 1f else 0.45f
@@ -281,24 +302,44 @@ class WireGuardActivity : Activity() {
     }
 
     private fun importPastedConfig() {
-        if (!runtime.state.canMutateProtectionConfiguration() || !importRunning.compareAndSet(false, true)) return
         val text = configInput.text?.toString().orEmpty()
-        configInput.setText("")
+        if (text.isBlank()) {
+            showImportResult(WireGuardImportResult(false, "wireguard_config_empty"))
+            return
+        }
+        importConfigText(text, "wireguard-import-paste", clearInputOnSuccess = true)
+    }
+
+    private fun importConfigText(text: String, workerName: String, clearInputOnSuccess: Boolean) {
+        if (!runtime.state.canMutateProtectionConfiguration()) {
+            Toast.makeText(this, R.string.wireguard_stop_first, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (text.toByteArray(StandardCharsets.UTF_8).size > MAX_CONFIG_BYTES) {
+            showImportResult(WireGuardImportResult(false, "wireguard_config_size_invalid"))
+            return
+        }
+        if (!importRunning.compareAndSet(false, true)) return
         setImportBusy(true)
-        val accepted = runtime.executeBackground("wireguard-import-paste") {
+        val accepted = runtime.executeBackground(workerName) {
             val result = runtime.wireGuard.importConfig(text)
-            runOnUiThread {
-                importRunning.set(false)
-                setImportBusy(false)
-                showImportResult(result)
-                refresh()
-            }
+            runOnUiThread { completeImport(result, clearInputOnSuccess) }
         }
-        if (!accepted) {
-            importRunning.set(false)
-            setImportBusy(false)
-            Toast.makeText(this, R.string.wireguard_runtime_busy, Toast.LENGTH_LONG).show()
-        }
+        if (!accepted) importWorkerRejected()
+    }
+
+    private fun completeImport(result: WireGuardImportResult, clearInputOnSuccess: Boolean) {
+        importRunning.set(false)
+        setImportBusy(false)
+        if (result.ok && clearInputOnSuccess) configInput.setText("")
+        showImportResult(result)
+        refresh()
+    }
+
+    private fun importWorkerRejected() {
+        importRunning.set(false)
+        setImportBusy(false)
+        Toast.makeText(this, R.string.wireguard_runtime_busy, Toast.LENGTH_LONG).show()
     }
 
     private fun openConfigPicker() {
@@ -309,10 +350,37 @@ class WireGuardActivity : Activity() {
         try {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
-                type = "text/plain"
+                type = "*/*"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }, REQUEST_IMPORT)
         } catch (_: RuntimeException) {
             Toast.makeText(this, R.string.wireguard_file_picker_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun openQrScanner() {
+        if (!runtime.state.canMutateProtectionConfiguration()) {
+            Toast.makeText(this, R.string.wireguard_stop_first, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (importRunning.get()) return
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
+            Toast.makeText(this, R.string.wireguard_qr_camera_unavailable, Toast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            val intent = ScanOptions()
+                .setCaptureActivity(WireGuardQrScannerActivity::class.java)
+                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                .setPrompt(getString(R.string.wireguard_qr_prompt))
+                .setBeepEnabled(false)
+                .setBarcodeImageEnabled(false)
+                .setOrientationLocked(false)
+                .createScanIntent(this)
+            startActivityForResult(intent, REQUEST_QR_IMPORT)
+        } catch (error: RuntimeException) {
+            RuntimeFailureLog.nonCritical("wireguard-qr-scanner", error)
+            Toast.makeText(this, R.string.wireguard_qr_scanner_failed, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -330,7 +398,12 @@ class WireGuardActivity : Activity() {
     }
 
     private fun showImportResult(result: WireGuardImportResult) {
-        val message = if (result.ok) getString(R.string.wireguard_import_ok) else getString(R.string.wireguard_import_failed, result.reason ?: "invalid")
+        val reason = when (result.reason) {
+            "wireguard_file_read_failed" -> getString(R.string.wireguard_import_reason_file)
+            "wireguard_qr_result_invalid" -> getString(R.string.wireguard_import_reason_qr)
+            else -> result.reason ?: getString(R.string.wireguard_import_reason_invalid)
+        }
+        val message = if (result.ok) getString(R.string.wireguard_import_ok) else getString(R.string.wireguard_import_failed, reason)
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         if (result.ok) runtime.notifyStateChanged()
     }
@@ -338,6 +411,10 @@ class WireGuardActivity : Activity() {
     private fun setImportBusy(busy: Boolean) {
         importButton.isEnabled = !busy
         importButton.alpha = if (busy) 0.45f else 1f
+        fileButton.isEnabled = !busy
+        fileButton.alpha = if (busy) 0.45f else 1f
+        qrButton.isEnabled = !busy
+        qrButton.alpha = if (busy) 0.45f else 1f
         configInput.isEnabled = !busy
     }
 
@@ -375,6 +452,7 @@ class WireGuardActivity : Activity() {
 
     companion object {
         private const val REQUEST_IMPORT = 9401
+        private const val REQUEST_QR_IMPORT = 9402
         private const val MAX_CONFIG_BYTES = 16 * 1024
     }
 }

@@ -7,6 +7,9 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+VERSION_CODE = (ROOT / "VERSION_CODE").read_text(encoding="utf-8").strip()
+if not VERSION_CODE.isdigit():
+    raise SystemExit("VERSION_CODE must be numeric")
 TOOLCHAINS = {}
 for raw in (ROOT / "TOOLCHAINS.lock").read_text(encoding="utf-8").splitlines():
     line = raw.strip()
@@ -15,7 +18,7 @@ for raw in (ROOT / "TOOLCHAINS.lock").read_text(encoding="utf-8").splitlines():
     k, v = line.split("=", 1)
     TOOLCHAINS[k.strip()] = v.strip()
 
-serial = uuid.uuid5(uuid.NAMESPACE_URL, f"https://visiongaia.dev/gedefense/mobile/{VERSION}/vc55/sbom")
+serial = uuid.uuid5(uuid.NAMESPACE_URL, f"https://visiongaia.dev/gedefense/mobile/{VERSION}/vc{VERSION_CODE}/sbom")
 
 def comp(ref: str, typ: str, name: str, version: str, purl: str | None = None, licenses: list[str] | None = None):
     out = {"type": typ, "bom-ref": ref, "name": name, "version": version}
@@ -30,6 +33,8 @@ components = [
     comp("pkg:generic/visiongaia/gedefense-core@" + VERSION, "library", "GeDefense Core", VERSION, "pkg:generic/visiongaia/gedefense-core@" + VERSION),
     comp("pkg:golang/visiongaia.dev/gedefense/mobile/netstack@" + VERSION, "application", "GaiaNet V2 Android Helper", VERSION, "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@" + VERSION),
     comp("pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24", "library", "Kotlin Standard Library", "1.9.24", "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24", ["Apache-2.0"]),
+    comp("pkg:maven/com.journeyapps/zxing-android-embedded@4.3.0", "library", "ZXing Android Embedded", "4.3.0", "pkg:maven/com.journeyapps/zxing-android-embedded@4.3.0", ["Apache-2.0"]),
+    comp("pkg:maven/com.google.zxing/core@3.5.3", "library", "ZXing Core", "3.5.3", "pkg:maven/com.google.zxing/core@3.5.3", ["Apache-2.0"]),
     comp("pkg:golang/golang.zx2c4.com/wireguard@0.0.20250522", "library", "wireguard-go", "0.0.20250522", "pkg:golang/golang.zx2c4.com/wireguard@0.0.20250522", ["MIT"]),
     comp("pkg:golang/golang.org/x/crypto@v0.37.0", "library", "golang.org/x/crypto", "v0.37.0", "pkg:golang/golang.org/x/crypto@v0.37.0", ["BSD-3-Clause"]),
     comp("pkg:golang/golang.org/x/net@v0.39.0", "library", "golang.org/x/net", "v0.39.0", "pkg:golang/golang.org/x/net@v0.39.0", ["BSD-3-Clause"]),
@@ -49,11 +54,23 @@ tools = [
 ]
 
 deps = [
-    {"ref": components[0]["bom-ref"], "dependsOn": [components[1]["bom-ref"], components[2]["bom-ref"], components[3]["bom-ref"]]},
+    {
+        "ref": components[0]["bom-ref"],
+        "dependsOn": [
+            components[1]["bom-ref"],
+            components[2]["bom-ref"],
+            components[3]["bom-ref"],
+            components[4]["bom-ref"],
+            components[5]["bom-ref"],
+        ],
+    },
     {"ref": components[1]["bom-ref"], "dependsOn": []},
-    {"ref": components[2]["bom-ref"], "dependsOn": [c["bom-ref"] for c in components[4:]]},
+    {"ref": components[2]["bom-ref"], "dependsOn": [c["bom-ref"] for c in components[6:]]},
+    {"ref": components[3]["bom-ref"], "dependsOn": []},
+    {"ref": components[4]["bom-ref"], "dependsOn": [components[5]["bom-ref"]]},
+    {"ref": components[5]["bom-ref"], "dependsOn": []},
 ]
-for c in components[3:]:
+for c in components[6:]:
     deps.append({"ref": c["bom-ref"], "dependsOn": []})
 
 bom = {
@@ -65,11 +82,12 @@ bom = {
         "component": components[0],
         "tools": {"components": tools},
         "properties": [
-            {"name": "visiongaia:versionCode", "value": "55"},
+            {"name": "visiongaia:versionCode", "value": VERSION_CODE},
             {"name": "visiongaia:compileSdk", "value": TOOLCHAINS["compile_sdk"]},
             {"name": "visiongaia:targetSdk", "value": TOOLCHAINS["target_sdk"]},
             {"name": "visiongaia:minSdk", "value": TOOLCHAINS["min_sdk"]},
             {"name": "visiongaia:goDependencyMode", "value": "offline-local-replace"},
+            {"name": "visiongaia:androidQrDependencyMode", "value": "offline-vendored-local-files"},
         ],
     },
     "components": components[1:],

@@ -3,7 +3,8 @@
 <p align="center"><strong>Lokale Android-Endpoint-Security, Netzwerkabwehr und XDR.</strong><br>Entwickelt von VisionGaiaTechnology für Umgebungen, in denen Sicherheitstelemetrie auf dem Gerät bleiben soll.</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md"><strong>Deutsch</strong></a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/Version-0.27.8--beta.6-D8A928?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/Version-0.27.8--beta.9-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-58-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/Datenschutz-local--first-06B6D4?style=flat-square" />
@@ -34,7 +35,7 @@ Die Architektur ist konsequent **local-first**: Sicherheitsentscheidungen erfolg
 | Evidence | Verschlüsseltes, authentifiziertes lokales Evidence Ledger mit begrenzter Recovery-Semantik |
 | Resilience | Begrenzte Selbstreparatur, Health Checks und Fail-Closed-Degradierung |
 | TITAN | Optionaler Device-Owner-Policy-Pfad für Managed-Device-Härtung und Lockdown |
-| Diagnostics | Nur vom Nutzer gestartetes Aggregate-Only-Support-Bundle, kein automatischer Upload |
+| Diagnostics | Nur vom Nutzer gestartetes Aggregate-Only-Support-Bundle plus Threat-Policy-Selbsttest ohne Netzwerkzugriff |
 
 ## Datenschutz und Telemetry Shield
 
@@ -91,7 +92,7 @@ Vor sensiblen Deployments: [`SECURITY.md`](SECURITY.md), [`THREAT-MODEL.md`](THR
 
 Benötigt werden JDK 17, Gradle 8.7, Android Platform/Build Tools 36, NDK `27.2.12479018` und Go 1.26.8.
 
-`app` und `core` besitzen **keine externen Android-Runtime-Bibliotheken**. GaiaNet verwendet einen kleinen, gepinnten und lokal vendorten Go-Dependency-Satz.
+`:app` enthält exakt **zwei gepinnte, lokal vendorte Apache-2.0-QR-Scanner-Artefakte** (ZXing Android Embedded + ZXing Core) für den lokalen WireGuard-QR-Import; `:core` bleibt frei von externen Android-Runtime-Bibliotheken. GaiaNet verwendet einen kleinen, gepinnten und lokal vendorten Go-Dependency-Satz.
 
 Kompletter Readiness-Lauf:
 
@@ -110,7 +111,7 @@ Exakter Offline-/Repro-Build: [`BUILD-RUNBOOK.md`](BUILD-RUNBOOK.md).
 | Русский | [`Master Architecture - RU`](docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf) |
 | 简体中文 | [`Master Architecture - ZH-CN`](docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf) |
 
-> Das Dossier dokumentiert die VC55-Architekturbaseline. Innerhalb desselben VersionCodes wurden danach weitere Härtungen vorgenommen. Für den aktuellen Implementierungsstand gelten `TOOLCHAINS.lock`, `SECURITY.md`, `CHANGELOG.md` und der Quellcode als maßgeblich.
+> Das Dossier dokumentiert die VC55-Architekturbaseline. Der aktuelle Quellstand ist **0.27.8-beta.9 / VC58** und enthält zusätzlich die OEM-HMAC-Recovery-Härtung, den Threat-Policy-Selbsttest ohne Netzwerkzugriff, den überarbeiteten transaktionalen Update-Screen sowie den dreifachen WireGuard-Import über Text, Datei und lokalen QR-Scan. Er prüft den geladenen `ThreatIndex`, Block-Autorität, Routenabdeckung und den exakten GDTI-Startserialisierer; die TUN-Erfassung fremder Apps bleibt ein separater Real-Device-Gate. Für den aktuellen Implementierungsstand gelten `TOOLCHAINS.lock`, `SECURITY.md`, `CHANGELOG.md` und der Quellcode als maßgeblich.
 
 ## Dokumentation
 

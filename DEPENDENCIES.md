@@ -2,21 +2,28 @@
 
 ## Android runtime
 
-GeDefense Mobile intentionally has no third-party Android runtime libraries.
+GeDefense Mobile keeps the Android runtime dependency surface deliberately small. The local WireGuard QR-import path adds exactly two pinned, in-tree Apache-2.0 runtime artifacts:
+
+- `com.journeyapps:zxing-android-embedded:4.3.0`
+- `com.google.zxing:core:3.5.3`
+
+Both artifacts are stored under `third_party/android/zxing/`, pinned by SHA-256 and consumed as local Gradle file dependencies. Release builds do not fetch QR runtime code from Maven. QR images and decoded WireGuard configuration stay inside the GeDefense application boundary and are passed directly to the existing bounded parser; no Google Play Services or external scanner application receives the profile.
 
 Application runtime stack:
 
 - Android platform APIs
 - Kotlin standard library
 - GeDefense `:core`
+- pinned local ZXing/JourneyApps QR scanner boundary
 - in-tree process-isolated GaiaNet V2 helper compiled reproducibly from `netstack/`
 
 Not used:
 
-- AndroidX / Jetpack Compose
+- Jetpack Compose
 - Retrofit / OkHttp
 - Room
 - analytics/ad/crash-reporting SDKs
+- Google Play Services / ML Kit QR scanning
 - third-party VPN/tun2socks stacks
 - third-party cryptographic libraries
 

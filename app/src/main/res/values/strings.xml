@@ -863,6 +863,12 @@ Policy fingerprint: %3$s…</string>
     <string name="diagnostics_state_review">REVIEW</string>
     <string name="diagnostics_runtime_summary">Bootstrap %1$s · Integrity %2$s · Evidence %3$s · Trust stores %4$s · GaiaNet %5$s</string>
     <string name="diagnostics_resilience_summary">VPN %1$s · Kill switch %2$s · Recoveries %3$d · Self-test %4$s (%5$d ms) · Battery readiness %6$s</string>
+    <string name="diagnostics_threat_self_test_title">Threat policy self-test</string>
+    <string name="diagnostics_threat_self_test_summary">Probe %1$s · Feeds %2$s · Reason %3$s
+Validates loaded ThreatIndex → ROUTE_BLOCK match → route coverage → GDTI serialization. No network connection is opened; TUN capture is outside this self-test.</string>
+    <string name="diagnostics_threat_self_test_action">Run threat policy self-test</string>
+    <string name="diagnostics_threat_self_test_started">Threat policy self-test started.</string>
+    <string name="diagnostics_threat_self_test_unavailable">Threat self-test requires active Full Flow protection.</string>
     <string name="diagnostics_android_title">Android app state</string>
     <string name="diagnostics_android_body">Open Android app details for OS-level battery, permission and background-state verification. No setting is changed automatically.</string>
     <string name="diagnostics_android_action">Open app details</string>
@@ -1058,10 +1064,17 @@ Policy fingerprint: %3$s…</string>
     <string name="wireguard_mode_title">Egress mode</string>
     <string name="wireguard_mode_body">Direct uses GaiaNet\'s native egress. WireGuard routes allowed packets through your peer. Strict additionally requires Android VPN lockdown before protection can start.</string>
     <string name="wireguard_profile_title">WireGuard profile</string>
-    <string name="wireguard_profile_body">Import one standard single-peer .conf. Keys are stored only in the encrypted GeDefense vault and are never shown again. Full-tunnel IPv4 (0.0.0.0/0) is required.</string>
+    <string name="wireguard_profile_body">Import a normal single-peer profile by paste, .conf file or local QR scan. Keys are stored only in the encrypted GeDefense vault and are not displayed afterwards. IPv4 full-tunnel (0.0.0.0/0) is required.</string>
     <string name="wireguard_config_hint">[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nEndpoint = …\nAllowedIPs = 0.0.0.0/0</string>
     <string name="wireguard_import_paste">Import pasted configuration</string>
     <string name="wireguard_import_file">Import .conf file</string>
+    <string name="wireguard_import_qr">Scan WireGuard QR</string>
+    <string name="wireguard_qr_prompt">Point the camera at the WireGuard configuration QR code.</string>
+    <string name="wireguard_qr_scanner_failed">The local QR scanner could not be opened.</string>
+    <string name="wireguard_qr_camera_unavailable">No camera is available for QR import on this device.</string>
+    <string name="wireguard_import_reason_file">the selected file could not be read as a bounded UTF-8 WireGuard configuration</string>
+    <string name="wireguard_import_reason_qr">the QR code does not contain a readable WireGuard configuration</string>
+    <string name="wireguard_import_reason_invalid">invalid configuration</string>
     <string name="wireguard_clear_profile">Delete stored profile</string>
     <string name="wireguard_security_title">Fail-closed security model</string>
     <string name="wireguard_security_body">GaiaNet evaluates threat policy before WireGuard. No direct fallback is permitted while WireGuard mode is active. Strict mode also requires Android Always-on VPN lockdown. Peer traffic is admitted only for flows already observed outbound.</string>
@@ -1103,4 +1116,26 @@ Policy fingerprint: %3$s…</string>
     <string name="scanner_install_guard_stage_deep">Deep scan</string>
     <string name="scanner_install_guard_active_body">%1$s · %2$s</string>
     <string name="live_policy_refresh_failed_stopped">The policy was saved, but the live VPN could not be refreshed. Protection was stopped to avoid enforcing stale rules.</string>
+
+    <string name="update_experience_title">GeDefense updated</string>
+    <string name="update_experience_subtitle">Review the security changes and refresh protection for this version.</string>
+    <string name="update_experience_version">Version %1$s</string>
+    <string name="update_experience_whats_new">What’s new</string>
+    <string name="update_experience_threat_title">Threat policy self-test</string>
+    <string name="update_experience_threat_body">The production ROUTE_BLOCK path can now be verified locally without generating external test traffic.</string>
+    <string name="update_experience_state_title">Update-stable security state</string>
+    <string name="update_experience_state_body">Setup state is loaded before startup routing. Integrity, Threat Intelligence, Geo and ASN now use update-stable, purpose-separated keys instead of individual OEM HMAC aliases.</string>
+    <string name="update_experience_flow_title">Safer update flow</string>
+    <string name="update_experience_flow_body">Existing installations remain configured. After an update GeDefense shows only this refresh, synchronizes Threat Intelligence and then verifies protection.</string>
+    <string name="update_experience_security_check">Security refresh</string>
+    <string name="update_experience_ready">Ready to synchronize current Threat Intelligence and activate protection.</string>
+    <string name="update_experience_sync_progress" tools:ignore="PluralsCandidate">Updating Threat Intelligence · %1$d/%2$d sources processed</string>
+    <string name="update_experience_sync_failed">Threat Intelligence update failed. The update notice stays active and protection is not acknowledged.</string>
+    <string name="update_experience_synced_activation_pending" tools:ignore="PluralsCandidate">Threat Intelligence is current · %1$d policy records loaded · protection activation pending</string>
+    <string name="update_experience_protected" tools:ignore="PluralsCandidate">Threat Intelligence is current · %1$d policy records loaded · protection already active</string>
+    <string name="update_experience_refresh_failed">Protection is active, but the policy refresh request failed. Try again before dismissing this update.</string>
+    <string name="update_experience_action">Update threats &amp; activate protection</string>
+    <string name="update_experience_action_running">Updating Threat Intelligence…</string>
+    <string name="update_experience_action_retry">Retry security refresh</string>
+    <string name="update_experience_footer">This notice is only dismissed after the security refresh reaches a verified protection state.</string>
 </resources>

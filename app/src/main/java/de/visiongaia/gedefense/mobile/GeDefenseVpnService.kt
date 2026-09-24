@@ -317,6 +317,9 @@ class GeDefenseVpnService : VpnService() {
             ProtectionMode.SELECTIVE -> "GUARDED"
         }
         runtime.state.setVpnStatus(activeStatus, null)
+        // An update notice is acknowledged only after Threat Intelligence sync completed and
+        // the requested protection transition reached a real guarded state.
+        runtime.setup.completePendingUpdateAfterProtection()
         armStrictInvariantWatchdog()
         runtime.notifyStateChanged(); updateNotification()
         if (!appendEvidence(

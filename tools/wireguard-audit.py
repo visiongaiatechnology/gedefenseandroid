@@ -12,6 +12,7 @@ vpn = (java/'GeDefenseVpnService.kt').read_text()
 profile = (java/'WireGuardProfileStore.kt').read_text()
 parser = (java/'WireGuardConfigParser.kt').read_text()
 activity = (java/'WireGuardActivity.kt').read_text()
+qr_activity = (java/'WireGuardQrScannerActivity.kt').read_text()
 build_ps1 = (ROOT/'tools/build-go-netstack.ps1').read_text()
 vault = (java/'SecureTelemetryVault.kt').read_text()
 state = (java/'RuntimeState.kt').read_text()
@@ -74,6 +75,9 @@ checks = {
     'config_bounds_aligned': 'MAX_WIREGUARD_CONFIG_BYTES = 16 * 1024' in native and 'MAX_CONFIG_BYTES = 16 * 1024' in parser and 'MAX_UAPI_BYTES = 16 * 1024' in profile,
     'mtu_end_to_end': 'frame[40] = (tunnelMtu ushr 8).toByte()' in native and 'tunMTU' in helper and 'wireGuardMTU' in engine and 'tunnelMtu = profile?.mtu ?: FULL_FLOW_MTU' in vpn,
     'explicit_wireguard_dns': 'dns.size in 1..MAX_DNS_SERVERS' in parser and 'configured.addDnsServer(it)' in vpn,
+    'conf_picker_mime_tolerant': 'type = "*/*"' in activity and 'FLAG_GRANT_READ_URI_PERMISSION' in activity,
+    'local_qr_import': 'ScanOptions.QR_CODE' in activity and 'WireGuardQrScannerActivity::class.java' in activity and 'SCAN_RESULT' in activity and 'FLAG_SECURE' in qr_activity,
+    'qr_parser_reuse': 'importConfigText(text, "wireguard-import-qr", clearInputOnSuccess = false)' in activity and 'runtime.wireGuard.importConfig(text)' in activity,
     'physical_underlay_socket_binding': 'underlay.bindSocket(duplicate.fileDescriptor)' in vpn and 'wireguard_underlay_unavailable' in vpn,
     'secret_entry_screen_secure': 'FLAG_SECURE' in activity and 'IMPORTANT_FOR_AUTOFILL_NO' in activity and 'IME_FLAG_NO_PERSONALIZED_LEARNING' in activity,
     'strict_utf8_import': 'CodingErrorAction.REPORT' in activity and 'bytes.fill(0)' in activity,
@@ -127,4 +131,4 @@ for path in java.rglob('*.kt'):
     if re.search(r'(?i)chacha20|poly1305|curve25519|noise[_ -]?ik', text):
         raise SystemExit(f'WIREGUARD_AUDIT_FAIL custom_crypto={path.name}')
 
-print('WIREGUARD_AUDIT_PASS single_vpn=true full_tunnel=true fail_closed=true stateful_ingress=true related_icmp=true stateful_fragments=true per_socket_protect=true protect_timeout=true timeout_budget=true helper_deadline=true protect_deadline_rearm=true underlay_bound=true mtu_propagated=true explicit_dns=true underlay_dns_resolution=true dns_timeout=true secret_buffers_wipeable=true go_secret_scratch_wiped=true secret_pipe=true uapi_hardened=true durable_mode=true config_freeze=true encrypted_roundtrip=true tun_anchor=true fail_closed_swap=true recovery_selftest_anchor=true underlay_wait=true strict_watchdog=true bounded_watchdog=true underlay_generation=true stale_transport_callbacks=true callback_io_serialized=true recovery_queue_fail_closed=true upstream_rekey=true')
+print('WIREGUARD_AUDIT_PASS single_vpn=true full_tunnel=true fail_closed=true stateful_ingress=true related_icmp=true stateful_fragments=true per_socket_protect=true protect_timeout=true timeout_budget=true helper_deadline=true protect_deadline_rearm=true underlay_bound=true mtu_propagated=true explicit_dns=true conf_picker_wildcard=true local_qr=true qr_parser_reuse=true underlay_dns_resolution=true dns_timeout=true secret_buffers_wipeable=true go_secret_scratch_wiped=true secret_pipe=true uapi_hardened=true durable_mode=true config_freeze=true encrypted_roundtrip=true tun_anchor=true fail_closed_swap=true recovery_selftest_anchor=true underlay_wait=true strict_watchdog=true bounded_watchdog=true underlay_generation=true stale_transport_callbacks=true callback_io_serialized=true recovery_queue_fail_closed=true upstream_rekey=true')

@@ -599,7 +599,7 @@ The dossier identifies several large Android lifecycle owners, the need for care
 
 ## AW. Architecture Strengths
 
-- zero third-party Android runtime-library surface;
+- minimal Android runtime-library surface with two pinned, locally vendored Apache-2.0 QR-scanner artifacts;
 - process isolation between Android control plane and Go data plane;
 - no JNI packet hot path;
 - update-stable key custody;

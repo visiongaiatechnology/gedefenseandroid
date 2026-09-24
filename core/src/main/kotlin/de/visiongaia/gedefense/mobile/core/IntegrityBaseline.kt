@@ -27,18 +27,29 @@ class IntegrityBaselineStore(
     private val file: File,
     private val key: SecretKey?,
     private val keyProvider: (() -> SecretKey?)? = null,
+    private val recoveryBoundaryMillis: Long? = null,
 ) {
     private val lock = Any()
 
     fun verifyOrAdvance(current: IntegrityIdentity): IntegrityBaselineDecision = synchronized(lock) {
-        if (activeKey() == null) return@synchronized IntegrityBaselineDecision(false, reason = "integrity_key_unavailable")
+        val activeKey = activeKey() ?: return@synchronized IntegrityBaselineDecision(false, reason = "integrity_key_unavailable")
         validateIdentity(current)?.let { return IntegrityBaselineDecision(false, reason = it) }
-        val state = readState(file)
+        val state = readState(file, activeKey)
         if (state == null) {
-            writeState(current)
+            writeState(current, activeKey)
             return IntegrityBaselineDecision(true, initialized = true, baseline = current)
         }
         if (!state.authenticated) {
+            if (eligibleForUpdateKeyRecovery(file)) {
+                writeState(current, activeKey)
+                return IntegrityBaselineDecision(
+                    ok = true,
+                    initialized = true,
+                    updated = true,
+                    reason = "integrity_update_key_recovered",
+                    baseline = current,
+                )
+            }
             return IntegrityBaselineDecision(false, reason = "integrity_baseline_authentication_failed")
         }
         val previous = state.identity
@@ -59,11 +70,18 @@ class IntegrityBaselineStore(
         }
 
         // A forward app update is trusted only when Android presents the same signing identity.
-        writeState(current)
+        writeState(current, activeKey)
         IntegrityBaselineDecision(true, updated = true, baseline = current)
     }
 
-    private fun readState(source: File): ParsedState? {
+    private fun eligibleForUpdateKeyRecovery(source: File): Boolean {
+        val boundary = recoveryBoundaryMillis ?: return false
+        if (boundary <= 0L || !source.isFile) return false
+        val modified = source.lastModified()
+        return modified in 1..boundary
+    }
+
+    private fun readState(source: File, activeKey: SecretKey): ParsedState? {
         if (!source.exists()) return null
         if (!source.isFile || source.length() !in 1..MAX_BYTES) return ParsedState.invalid()
         return try {
@@ -81,14 +99,14 @@ class IntegrityBaselineStore(
             if (validateIdentity(identity) != null) return ParsedState.invalid()
             val provided = fields["mac"] ?: return ParsedState.invalid()
             if (!provided.matches(HEX_64)) return ParsedState.invalid()
-            val expected = hmac(payload(identity))
+            val expected = hmac(payload(identity), activeKey)
             ParsedState(identity, constantTimeEquals(expected, provided))
         } catch (_: Exception) {
             ParsedState.invalid()
         }
     }
 
-    private fun writeState(identity: IntegrityIdentity) {
+    private fun writeState(identity: IntegrityIdentity, activeKey: SecretKey) {
         val parent = file.parentFile ?: throw IllegalStateException("integrity baseline parent missing")
         require(parent.mkdirs() || parent.isDirectory) { "integrity baseline directory unavailable" }
         val body = buildString {
@@ -97,13 +115,13 @@ class IntegrityBaselineStore(
             append("version_code=").append(identity.versionCode).append('\n')
             append("install_sha256=").append(identity.installSha256).append('\n')
             append("signer_sha256=").append(identity.signerSha256).append('\n')
-            append("mac=").append(hmac(payload(identity))).append('\n')
+            append("mac=").append(hmac(payload(identity), activeKey)).append('\n')
         }.toByteArray(Charsets.UTF_8)
         require(body.size <= MAX_BYTES) { "integrity baseline too large" }
         val temp = Files.createTempFile(parent.toPath(), ".${file.name.take(72)}.new-", ".tmp").toFile()
         try {
             FileOutputStream(temp).use { out -> out.write(body); out.fd.sync() }
-            val staged = readState(temp)
+            val staged = readState(temp, activeKey)
             if (staged == null || !staged.authenticated || staged.identity != identity) {
                 throw IllegalStateException("integrity baseline staged verification failed")
             }
@@ -124,14 +142,12 @@ class IntegrityBaselineStore(
     private fun payload(identity: IntegrityIdentity): String =
         "v1|${identity.packageName}|${identity.versionCode}|${identity.installSha256}|${identity.signerSha256}"
 
-    private fun hmac(value: String): String {
-        val activeKey = activeKey() ?: throw IllegalStateException("integrity key unavailable")
-        return hex(BoundedSecretKeyCrypto.execute(activeKey) {
+    private fun hmac(value: String, activeKey: SecretKey): String =
+        hex(BoundedSecretKeyCrypto.execute(activeKey) {
             val mac = Mac.getInstance("HmacSHA256")
             mac.init(activeKey)
             mac.doFinal(value.toByteArray(Charsets.UTF_8))
         })
-    }
 
     private fun activeKey(): SecretKey? = try {
         keyProvider?.invoke() ?: key

@@ -1,0 +1,4 @@
+4ab03353127c34e55cbb80fbc9a34031decbcfb1ec5e8f991944d2d494621a33  /mnt/data/gedefense_vc58_final/third_party/android/zxing/zxing-android-embedded-4.3.0.aar
+8d8064c1636fdaef7189dd9055c7d59950a8940a12f2293956446ec3c109fd82  /mnt/data/gedefense_vc58_final/third_party/android/zxing/zxing-core-3.5.3.jar
+c4dd09974335c21efee7ca29183ecae5ef7e26b48265a605c653a3efce47f29b  /mnt/data/gedefense_vc58_final/third_party/android/zxing/zxing-android-embedded-4.3.0.pom
+d8a12e8bf69054e2add23d7953414eaefddacec930140a8d144d1fac9e62b7df  /mnt/data/gedefense_vc58_final/third_party/android/zxing/zxing-core-3.5.3.pom

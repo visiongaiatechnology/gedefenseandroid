@@ -25,6 +25,9 @@ class DiagnosticsActivity : Activity() {
     private lateinit var runtimeSummary: TextView
     private lateinit var resilienceBadge: TextView
     private lateinit var resilienceSummary: TextView
+    private lateinit var threatSelfTestBadge: TextView
+    private lateinit var threatSelfTestSummary: TextView
+    private lateinit var threatSelfTestButton: TextView
     private lateinit var privacySummary: TextView
     private lateinit var exportButton: TextView
     private val exportRunning = AtomicBoolean(false)
@@ -88,6 +91,23 @@ class DiagnosticsActivity : Activity() {
         resilienceBadge = GeDefenseUi.pill(this, getString(R.string.ui_waiting), GeDefenseUi.gold)
         resilienceSummary = GeDefenseUi.textView(this, "", 10.4f, GeDefenseUi.textMuted)
         rootLayout.addView(statusCard(VgtIcon.SHIELD, GeDefenseUi.gold, getString(R.string.diagnostics_resilience_title), resilienceBadge, resilienceSummary))
+
+        gap(12)
+        threatSelfTestBadge = GeDefenseUi.pill(this, getString(R.string.ui_waiting), GeDefenseUi.gold)
+        threatSelfTestSummary = GeDefenseUi.textView(this, "", 10.4f, GeDefenseUi.textMuted).apply {
+            setLineSpacing(dp(2).toFloat(), 1f)
+        }
+        threatSelfTestButton = GeDefenseUi.actionButton(this, getString(R.string.diagnostics_threat_self_test_action), goldStyle = true) {
+            runThreatEnforcementSelfTest()
+        }
+        rootLayout.addView(statusCard(
+            VgtIcon.BLOCK,
+            GeDefenseUi.red,
+            getString(R.string.diagnostics_threat_self_test_title),
+            threatSelfTestBadge,
+            threatSelfTestSummary,
+            threatSelfTestButton,
+        ))
 
         gap(12)
         privacySummary = GeDefenseUi.textView(this, getString(R.string.diagnostics_privacy_body), 10.2f, GeDefenseUi.textMuted).apply {
@@ -166,9 +186,43 @@ class DiagnosticsActivity : Activity() {
             runtime.state.lastResilienceSelfTestDurationMillis(),
             if (setup.batteryReady) getString(R.string.always_on_enabled) else getString(R.string.always_on_disabled),
         )
+
+        val threatTest = runtime.threatEnforcementSelfTest.get()
+        val threatColor = when (threatTest.state) {
+            "PASS" -> GeDefenseUi.green
+            "FAIL" -> GeDefenseUi.red
+            "RUNNING" -> GeDefenseUi.cyan
+            else -> GeDefenseUi.gold
+        }
+        styleBadge(threatSelfTestBadge, threatColor)
+        threatSelfTestBadge.text = threatTest.state
+        val target = threatTest.target ?: getString(R.string.ui_none)
+        val feeds = threatTest.feeds.takeIf { it.isNotEmpty() }?.joinToString(",") ?: getString(R.string.ui_none)
+        val reason = threatTest.reason ?: getString(R.string.ui_none)
+        threatSelfTestSummary.text = getString(
+            R.string.diagnostics_threat_self_test_summary,
+            target,
+            feeds,
+            reason,
+        )
+        val threatTestAvailable = runtime.state.isVpnActive() &&
+            runtime.state.protectionMode() == ProtectionMode.FULL_FLOW_BETA &&
+            runtime.state.lastVpnStatus() == "FULL_GUARDED" && threatTest.state != "RUNNING"
+        threatSelfTestButton.isEnabled = threatTestAvailable
+        threatSelfTestButton.alpha = if (threatTestAvailable) 1f else 0.55f
     }
 
-    private fun statusCard(icon: VgtIcon, accent: Int, title: String, badge: TextView, summary: TextView): View = FrameLayout(this).apply {
+    private fun runThreatEnforcementSelfTest() {
+        val started = runtime.runThreatEnforcementSelfTest()
+        Toast.makeText(
+            this,
+            if (started) R.string.diagnostics_threat_self_test_started else R.string.diagnostics_threat_self_test_unavailable,
+            Toast.LENGTH_LONG,
+        ).show()
+        refresh()
+    }
+
+    private fun statusCard(icon: VgtIcon, accent: Int, title: String, badge: TextView, summary: TextView, vararg extras: View): View = FrameLayout(this).apply {
         background = GeDefenseUi.glassPanelBackground(this@DiagnosticsActivity, accent = accent, radius = 18)
         addView(LinearLayout(this@DiagnosticsActivity).apply {
             orientation = LinearLayout.VERTICAL
@@ -181,6 +235,9 @@ class DiagnosticsActivity : Activity() {
                 addView(badge)
             })
             addView(summary.apply { setPadding(0, dp(10), 0, 0); setLineSpacing(dp(2).toFloat(), 1f) })
+            extras.forEach { extra ->
+                addView(extra, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+            }
         }, FrameLayout.LayoutParams(-1, -2))
     }
 

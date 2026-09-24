@@ -1,4 +1,4 @@
-# GeDefense Mobile Architecture — 0.27.8-beta.6
+# GeDefense Mobile Architecture — 0.27.8-beta.7
 
 ## Secure Telemetry Vault
 
@@ -257,6 +257,8 @@ Startup malware-analysis restoration is a read-only authenticated cache reconstr
 
 `DiagnosticBundleBuilder` is an explicit export boundary above runtime state. It serializes aggregate health and performance metadata only and cannot read packet payloads or emit package/domain/IP identity lists. `DiagnosticsActivity` writes only to a user-selected SAF document and is `exported=false`.
 
+VC56 adds a no-egress **Threat Policy Self-Test** to the same non-exported diagnostics surface. While Full Flow is guarded, the test selects a real `ROUTE_BLOCK` route from the immutable `ThreatIndex`, validates the production Kotlin matcher, block authority and route coverage, then serializes that same index through `ThreatPolicyBinary`, the exact GDTI writer used for GaiaNet startup. It validates ABI version, record count and policy fingerprint locally. The test opens no network connection, does not mutate the active transport and does not fabricate production block metrics, XDR events or Evidence records. It therefore validates policy/index/serialization coherence only; third-party-app TUN capture and real packet enforcement remain separate real-device gates.
+
 ## 0.27.8-beta.5 audit — runtime publication and bounded Android service boundary
 
 The Beta-5 audit separates **runtime publication** from **security readiness**. This is a corrective architecture change after encrypted/authenticated persistence introduced too many synchronous AndroidKeyStore, crypto, Binder and storage dependencies into `AppRuntime` construction.
@@ -289,7 +291,7 @@ The permanent regression layer includes `runtime-bootstrap-audit.py`, `main-thre
 
 The setup wizard is presentation over cached/event-driven setup state. Android/OEM access checks refresh asynchronously when the wizard resumes or regains focus; UI rendering does not synchronously query Binder services. The first Threat-Intelligence synchronization is an explicit runtime-owned state machine and a mandatory setup gate before first protection activation.
 
-WireGuard sources are vendored and pinned and the GaiaNet egress integration is now implemented in the working tree. GaiaNet remains the local inspection/policy plane; allowed Layer-3 packets enter an in-process `wireguard-go` TUN and decrypted peer traffic returns through bounded stateful ingress checks. WireGuard uses per-socket Android protection rather than a whole-UID VPN bypass, propagates the imported MTU through the current helper protocol, requires explicit DNS configuration and rebuilds on preferred-underlay handover. Strict WireGuard mode requires Android lockdown and never silently uses Direct Internet. VC55 / 0.27.8-beta.6 is the current signed beta baseline; public promotion remains blocked on the remaining real-device gates and the new pre-public-release privacy/install/self-healing work.
+WireGuard sources are vendored and pinned and the GaiaNet egress integration is now implemented in the working tree. GaiaNet remains the local inspection/policy plane; allowed Layer-3 packets enter an in-process `wireguard-go` TUN and decrypted peer traffic returns through bounded stateful ingress checks. WireGuard uses per-socket Android protection rather than a whole-UID VPN bypass, propagates the imported MTU through the current helper protocol, requires explicit DNS configuration and rebuilds on preferred-underlay handover. Strict WireGuard mode requires Android lockdown and never silently uses Direct Internet. VC56 / 0.27.8-beta.7 is the current beta candidate; the published master dossier remains the VC55 architecture baseline. Public promotion remains gated by real-device validation.
 
 
 ## Telemetry Shield / local Privacy Intelligence

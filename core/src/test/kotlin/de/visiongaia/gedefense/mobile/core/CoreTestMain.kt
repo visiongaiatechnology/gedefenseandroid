@@ -772,6 +772,24 @@ private fun testIntegrityBaseline(){
         assertTrue(!store.verifyOrAdvance(upgraded.copy(signerSha256="5".repeat(64))).ok,"signer change rejected")
         val bytes=file.readBytes(); bytes[bytes.size/2]=(bytes[bytes.size/2].toInt() xor 1).toByte(); file.writeBytes(bytes)
         assertTrue(!store.verifyOrAdvance(upgraded).ok,"baseline MAC tamper rejected")
+
+        val migrationFile=File(dir,"baseline-migration.v1")
+        val legacyKey=SecretKeySpec(ByteArray(32){(it+31).toByte()},"HmacSHA256")
+        val activeKey=SecretKeySpec(ByteArray(32){(it+71).toByte()},"HmacSHA256")
+        val legacyStore=IntegrityBaselineStore(migrationFile,legacyKey)
+        assertTrue(legacyStore.verifyOrAdvance(base).ok,"legacy integrity baseline initialized")
+        val migrationBoundary=System.currentTimeMillis()+5_000L
+        val migrated=IntegrityBaselineStore(migrationFile,activeKey,recoveryBoundaryMillis=migrationBoundary)
+            .verifyOrAdvance(upgraded)
+        assertTrue(migrated.ok&&migrated.reason=="integrity_update_key_recovered","pre-update integrity key migration recovers")
+        assertTrue(IntegrityBaselineStore(migrationFile,activeKey).verifyOrAdvance(upgraded).ok,"migrated integrity baseline authenticates")
+
+        val lateFile=File(dir,"baseline-post-update-tamper.v1")
+        assertTrue(IntegrityBaselineStore(lateFile,legacyKey).verifyOrAdvance(base).ok,"late baseline initialized")
+        val oldBoundary=System.currentTimeMillis()-10_000L
+        lateFile.setLastModified(System.currentTimeMillis())
+        val notRecovered=IntegrityBaselineStore(lateFile,activeKey,recoveryBoundaryMillis=oldBoundary).verifyOrAdvance(upgraded)
+        assertTrue(!notRecovered.ok&&notRecovered.reason=="integrity_baseline_authentication_failed","post-update baseline tamper is never healed")
     }finally{dir.deleteRecursively()}
 }
 

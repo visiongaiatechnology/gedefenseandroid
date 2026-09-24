@@ -449,6 +449,37 @@ object NativeGaiaNet {
 
     fun setTelemetryDetailed(detailed: Boolean): Boolean = activeSession?.setTelemetryDetailed(detailed) ?: false
 
+    /**
+     * Serializes the current immutable threat index through the exact policy writer used for
+     * GaiaNet startup and validates its fixed header locally. No socket is opened and the active
+     * transport/session is not mutated.
+     */
+    fun validateThreatPolicySnapshot(index: ThreatIndex, cacheDir: File): Boolean {
+        if (index.count <= 0) return false
+        val descriptor = ThreatPolicyBinary.create(index, cacheDir) ?: return false
+        return try {
+            ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+                val header = ByteArray(44)
+                var offset = 0
+                while (offset < header.size) {
+                    val read = input.read(header, offset, header.size - offset)
+                    if (read <= 0) return@use false
+                    offset += read
+                }
+                if (header[0] != 'G'.code.toByte() || header[1] != 'D'.code.toByte() ||
+                    header[2] != 'T'.code.toByte() || header[3] != 'I'.code.toByte() || header[4] != 2.toByte()) return@use false
+                val count = ((header[8].toInt() and 0xff) shl 24) or
+                    ((header[9].toInt() and 0xff) shl 16) or
+                    ((header[10].toInt() and 0xff) shl 8) or (header[11].toInt() and 0xff)
+                if (count != index.count) return@use false
+                val fingerprint = header.copyOfRange(12, 44).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                fingerprint == index.fullPolicySha256
+            }
+        } catch (_: IOException) {
+            false
+        }
+    }
+
     fun stop() {
         activeSession?.close()
     }

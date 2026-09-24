@@ -6,9 +6,10 @@ GeDefense minimizes runtime dependencies and treats build tooling as an explicit
 
 - Android platform APIs and Kotlin standard library.
 - In-tree `:core` module.
+- Local-only WireGuard QR scanning through pinned vendored ZXing Android Embedded 4.3.0 + ZXing Core 3.5.3 (Apache-2.0); no Maven/network resolution at release time.
 - In-tree GaiaNet V2 helper plus pinned, vendored upstream `wireguard-go 0.0.20250522`.
 - Pinned vendored Go support modules: `golang.org/x/crypto v0.37.0`, `x/net v0.39.0`, `x/sys v0.32.0`, `x/term v0.31.0`, `x/text v0.24.0`. Release builds resolve them only through local `replace` directives with `GOPROXY=off` / `GOSUMDB=off`.
-- No analytics, advertising, remote configuration, WebView runtime, Retrofit/OkHttp/Room or third-party Android VPN/tun2socks SDK. WireGuard cryptographic primitives are upstream `wireguard-go`/Go crypto code, not a GeDefense reimplementation.
+- No analytics, advertising, remote configuration, WebView runtime, Retrofit/OkHttp/Room, Google Play Services QR scanning or third-party Android VPN/tun2socks SDK. WireGuard cryptographic primitives are upstream `wireguard-go`/Go crypto code, not a GeDefense reimplementation.
 
 `tools/go-supply-chain-reachability-audit.py` freezes the exact external Go package surface compiled into the Android helper. The 2026 advisory review found known issues in older vendored module versions only in packages that are not reachable from the helper (`x/crypto/ssh`, `x/net/html`, `x/net/dns/dnsmessage`, `x/net/http2`, `x/net/idna`, `x/text/unicode/norm`, `x/sys/windows`). The gate fails if any reviewed advisory package becomes reachable. Go itself is pinned to 1.26.8, which contains the standard-library fixes relevant to this build.
 

@@ -29,7 +29,7 @@ snapshot = require(
 )
 integrity = require(
     "core/src/main/kotlin/de/visiongaia/gedefense/mobile/core/IntegrityBaseline.kt",
-    "readState(temp)",
+    "readState(temp, activeKey)",
     "integrity baseline staged verification failed",
     "DurableAtomicFiles.replace(temp, file)",
 )

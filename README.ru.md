@@ -3,7 +3,8 @@
 <p align="center"><strong>Локальная защита Android-устройств, сетевой трафик и XDR.</strong><br>Проект VisionGaiaTechnology для сред, где телеметрия безопасности должна оставаться на устройстве.</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md"><strong>Русский</strong></a> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/version-0.27.8--beta.6-D8A928?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/version-0.27.8--beta.9-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-58-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/privacy-local--first-06B6D4?style=flat-square" />
@@ -34,7 +35,7 @@ GeDefense Mobile - нативная платформа безопасности 
 | Evidence | Локальный зашифрованный и аутентифицированный журнал с ограниченным recovery |
 | Resilience | Ограниченное восстановление, health checks и fail-closed деградация |
 | TITAN | Опциональная Device Owner policy plane для hardening и lockdown |
-| Diagnostics | Только вручную экспортируемый aggregate-only support bundle; автоматической загрузки нет |
+| Диагностика | Aggregate-only пакет поддержки только с ручным экспортом плюс самотест политики угроз без сетевого выхода |
 
 ## Privacy и Telemetry Shield
 
@@ -91,7 +92,7 @@ Android-host управляет lifecycle, policy, Keystore и UI state. GaiaNet
 
 Требуются JDK 17, Gradle 8.7, Android Platform/Build Tools 36, NDK `27.2.12479018`, Go 1.26.8.
 
-`app` и `core` имеют **ноль сторонних Android runtime libraries**. GaiaNet использует небольшой закреплённый vendored-набор Go dependencies.
+`:app` содержит ровно **два закреплённых локально vendored Apache-2.0 артефакта QR-сканера** (ZXing Android Embedded + ZXing Core) для локального импорта WireGuard по QR; `:core` остаётся без сторонних Android runtime libraries. GaiaNet использует небольшой закреплённый vendored-набор Go dependencies.
 
 Полная проверка readiness:
 
@@ -110,7 +111,7 @@ bash tools/release-readiness.sh
 | Русский | [`Master Architecture - RU`](docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf) |
 | 简体中文 | [`Master Architecture - ZH-CN`](docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf) |
 
-> Dossier описывает архитектурную baseline VC55. Позже в том же VersionCode были добавлены дополнительные hardening-изменения. Для актуального состояния приоритет имеют `TOOLCHAINS.lock`, `SECURITY.md`, `CHANGELOG.md` и исходный код.
+> Dossier фиксирует архитектурную baseline VC55. Текущий исходный код имеет версию **0.27.8-beta.9 / VC58** и дополнительно включает укрепление непрерывности OEM-HMAC, самотест политики угроз без сетевого выхода, обновлённый транзакционный экран после обновления и тройной импорт профилей WireGuard (текст, файл и локальный QR-скан). Самотест проверяет загруженный `ThreatIndex`, полномочия блокировки, покрытие маршрутом и тот же сериализатор GDTI, который используется при запуске GaiaNet; перехват трафика сторонних приложений через TUN остаётся отдельной проверкой на реальном устройстве. Для актуального состояния приоритет имеют `TOOLCHAINS.lock`, `SECURITY.md`, `CHANGELOG.md` и исходный код.
 
 ## Документация
 

@@ -39,6 +39,9 @@ data class DeviceSetupSnapshot(
     val deviceAdminActive: Boolean,
     val deviceOwnerActive: Boolean,
     val wizardCompleted: Boolean,
+    val lastAcknowledgedVersionCode: Int,
+    val updateSyncedVersionCode: Int,
+    val pendingUpdateActivationVersionCode: Int,
     val platformQueryOk: Boolean = true,
 )
 
@@ -68,13 +71,30 @@ class DeviceSetupManager(context: Context) {
         try {
             executor.execute {
                 val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                val wizard = runCatching { prefs.getInt(KEY_WIZARD_VERSION, 0) >= CURRENT_WIZARD_VERSION }.getOrDefault(false)
+                val completedMarker = runCatching { prefs.getBoolean(KEY_WIZARD_COMPLETED, false) }.getOrDefault(false)
+                val legacyWizardVersion = runCatching { prefs.getInt(KEY_WIZARD_VERSION, 0) }.getOrDefault(0)
+                // Completion is intentionally monotonic. A future onboarding schema/version must never
+                // turn a previously configured installation back into a first-run device.
+                val wizard = completedMarker || legacyWizardVersion > 0
                 val visited = runCatching { prefs.getBoolean(KEY_AUTOSTART_VISITED, false) }.getOrDefault(false)
+                val acknowledged = runCatching { prefs.getInt(KEY_LAST_ACK_VERSION_CODE, 0) }.getOrDefault(0).coerceAtLeast(0)
+                val synced = runCatching { prefs.getInt(KEY_UPDATE_SYNCED_VERSION_CODE, 0) }.getOrDefault(0).coerceAtLeast(0)
+                val pendingActivation = runCatching { prefs.getInt(KEY_PENDING_UPDATE_ACTIVATION_VERSION_CODE, 0) }.getOrDefault(0).coerceAtLeast(0)
                 val previous = cached.get()
-                val updated = previous.copy(wizardCompleted = wizard, autostartVisited = visited)
+                val updated = previous.copy(
+                    wizardCompleted = wizard,
+                    autostartVisited = visited,
+                    lastAcknowledgedVersionCode = acknowledged,
+                    updateSyncedVersionCode = synced,
+                    pendingUpdateActivationVersionCode = pendingActivation,
+                )
+                if (wizard && !completedMarker) {
+                    // Self-heal installs completed by older builds that only persisted wizard_version.
+                    runCatching { prefs.edit().putBoolean(KEY_WIZARD_COMPLETED, true).commit() }
+                }
                 cached.set(updated)
-                if (updated != previous) notifyListeners()
                 preferencesLoaded.countDown()
+                if (updated != previous) notifyListeners()
                 refreshSnapshot()
             }
         } catch (_: RejectedExecutionException) {
@@ -110,6 +130,70 @@ class DeviceSetupManager(context: Context) {
     }
 
     fun isWizardCompleted(): Boolean = cached.get().wizardCompleted
+
+    fun isPreferenceStateLoaded(): Boolean = preferencesLoaded.count == 0L
+
+    fun shouldShowUpdateExperience(): Boolean {
+        val state = cached.get()
+        return state.wizardCompleted && state.lastAcknowledgedVersionCode < currentAppVersionCode()
+    }
+
+    fun isUpdateThreatSyncCompleteForCurrentVersion(): Boolean =
+        cached.get().updateSyncedVersionCode >= currentAppVersionCode()
+
+    fun hasPendingUpdateActivationForCurrentVersion(): Boolean =
+        cached.get().pendingUpdateActivationVersionCode == currentAppVersionCode()
+
+    fun markUpdateThreatSyncCompleted(versionCode: Int = currentAppVersionCode()) {
+        if (versionCode != currentAppVersionCode()) return
+        val before = cached.get()
+        if (!before.wizardCompleted) return
+        val after = cached.updateAndGet { state ->
+            state.copy(updateSyncedVersionCode = maxOf(state.updateSyncedVersionCode, versionCode))
+        }
+        if (after != before) notifyListeners()
+        persistSetup { edit -> edit.putInt(KEY_UPDATE_SYNCED_VERSION_CODE, versionCode) }
+    }
+
+    fun markUpdateActivationPending(versionCode: Int = currentAppVersionCode()) {
+        if (versionCode != currentAppVersionCode()) return
+        val before = cached.get()
+        if (!before.wizardCompleted || before.updateSyncedVersionCode < versionCode) return
+        val after = cached.updateAndGet { state -> state.copy(pendingUpdateActivationVersionCode = versionCode) }
+        if (after != before) notifyListeners()
+        persistSetup { edit -> edit.putInt(KEY_PENDING_UPDATE_ACTIVATION_VERSION_CODE, versionCode) }
+    }
+
+    fun markUpdateExperienceAcknowledged(versionCode: Int = currentAppVersionCode()) {
+        if (versionCode != currentAppVersionCode()) return
+        val before = cached.get()
+        if (!before.wizardCompleted || before.updateSyncedVersionCode < versionCode) return
+        val after = cached.updateAndGet { state ->
+            state.copy(
+                lastAcknowledgedVersionCode = maxOf(state.lastAcknowledgedVersionCode, versionCode),
+                updateSyncedVersionCode = maxOf(state.updateSyncedVersionCode, versionCode),
+                pendingUpdateActivationVersionCode = 0,
+            )
+        }
+        if (after != before) notifyListeners()
+        persistSetup { edit ->
+            edit.putInt(KEY_LAST_ACK_VERSION_CODE, versionCode)
+                .putInt(KEY_UPDATE_SYNCED_VERSION_CODE, versionCode)
+                .remove(KEY_PENDING_UPDATE_ACTIVATION_VERSION_CODE)
+        }
+    }
+
+    fun completePendingUpdateAfterProtection(): Boolean {
+        val state = cached.get()
+        val pending = state.pendingUpdateActivationVersionCode
+        if (pending <= 0 || state.updateSyncedVersionCode < pending) return false
+        if (pending != currentAppVersionCode()) return false
+        markUpdateExperienceAcknowledged(pending)
+        return true
+    }
+
+    fun currentAppVersionCode(): Int = BuildConfig.VERSION_CODE
+
     fun isDeviceAdminActive(): Boolean = cached.get().deviceAdminActive
     fun isDeviceOwnerActive(): Boolean = cached.get().deviceOwnerActive
     fun isBackgroundRestricted(): Boolean = cached.get().batteryBackgroundRestricted
@@ -194,22 +278,43 @@ class DeviceSetupManager(context: Context) {
     }
 
     fun markWizardCompleted() {
+        val versionCode = currentAppVersionCode()
         val before = cached.get()
-        val after = cached.updateAndGet { it.copy(wizardCompleted = true) }
+        val after = cached.updateAndGet { state ->
+            state.copy(
+                wizardCompleted = true,
+                lastAcknowledgedVersionCode = maxOf(state.lastAcknowledgedVersionCode, versionCode),
+                updateSyncedVersionCode = maxOf(state.updateSyncedVersionCode, versionCode),
+                pendingUpdateActivationVersionCode = 0,
+            )
+        }
         if (after != before) notifyListeners()
         persistSetup { edit ->
             edit.putBoolean(KEY_WIZARD_COMPLETED, true)
-                .putInt(KEY_WIZARD_VERSION, CURRENT_WIZARD_VERSION)
+                .putInt(KEY_WIZARD_VERSION, SETUP_SCHEMA_VERSION)
+                .putInt(KEY_LAST_ACK_VERSION_CODE, versionCode)
+                .putInt(KEY_UPDATE_SYNCED_VERSION_CODE, versionCode)
+                .remove(KEY_PENDING_UPDATE_ACTIVATION_VERSION_CODE)
         }
     }
 
     fun resetWizard() {
         val before = cached.get()
-        val after = cached.updateAndGet { it.copy(wizardCompleted = false) }
+        val after = cached.updateAndGet { state ->
+            state.copy(
+                wizardCompleted = false,
+                lastAcknowledgedVersionCode = 0,
+                updateSyncedVersionCode = 0,
+                pendingUpdateActivationVersionCode = 0,
+            )
+        }
         if (after != before) notifyListeners()
         persistSetup { edit ->
             edit.putBoolean(KEY_WIZARD_COMPLETED, false)
                 .remove(KEY_WIZARD_VERSION)
+                .remove(KEY_LAST_ACK_VERSION_CODE)
+                .remove(KEY_UPDATE_SYNCED_VERSION_CODE)
+                .remove(KEY_PENDING_UPDATE_ACTIVATION_VERSION_CODE)
         }
     }
 
@@ -333,6 +438,9 @@ class DeviceSetupManager(context: Context) {
         deviceAdminActive = false,
         deviceOwnerActive = false,
         wizardCompleted = false,
+        lastAcknowledgedVersionCode = 0,
+        updateSyncedVersionCode = 0,
+        pendingUpdateActivationVersionCode = 0,
         platformQueryOk = false,
     )
 
@@ -342,7 +450,10 @@ class DeviceSetupManager(context: Context) {
         private const val KEY_WIZARD_COMPLETED = "wizard_completed"
         private const val KEY_AUTOSTART_VISITED = "autostart_visited"
         private const val KEY_WIZARD_VERSION = "wizard_version"
-        private const val CURRENT_WIZARD_VERSION = 2
+        private const val KEY_LAST_ACK_VERSION_CODE = "last_acknowledged_version_code"
+        private const val KEY_UPDATE_SYNCED_VERSION_CODE = "update_synced_version_code"
+        private const val KEY_PENDING_UPDATE_ACTIVATION_VERSION_CODE = "pending_update_activation_version_code"
+        private const val SETUP_SCHEMA_VERSION = 2
         private const val MAX_PREFERENCE_WAIT_MS = 1_000L
     }
 }

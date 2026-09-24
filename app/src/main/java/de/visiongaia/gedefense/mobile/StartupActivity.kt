@@ -185,14 +185,9 @@ class StartupActivity : Activity() {
             .setDuration(EXIT_FADE_MS)
             .withEndAction {
                 if (isFinishing || isDestroyed) return@withEndAction
-                if (runtime.setup.isWizardCompleted()) {
-                    startActivity(Intent(this, MainActivity::class.java))
-                } else {
-                    startActivities(arrayOf(
-                        Intent(this, MainActivity::class.java),
-                        Intent(this, SetupWizardActivity::class.java),
-                    ))
-                }
+                // MainActivity is the single owner of post-bootstrap routing. Keeping first-run/update
+                // decisions in one place prevents duplicate SetupWizard instances and update races.
+                startActivity(Intent(this, MainActivity::class.java))
                 finish()
             }
             .start()

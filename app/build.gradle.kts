@@ -12,14 +12,15 @@ val releaseKeyPassword = System.getenv("GEDEFENSE_RELEASE_KEY_PASSWORD")
 android {
     namespace = "de.visiongaia.gedefense.mobile"
     compileSdk = 36
+    buildToolsVersion = "36.0.0"
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "de.visiongaia.gedefense.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 55
-        versionName = "0.27.8-beta.6"
+        versionCode = 58
+        versionName = "0.27.8-beta.9"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
@@ -68,4 +69,6 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(files("../third_party/android/zxing/zxing-android-embedded-4.3.0.aar"))
+    implementation(files("../third_party/android/zxing/zxing-core-3.5.3.jar"))
 }

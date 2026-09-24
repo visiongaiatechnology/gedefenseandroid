@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
@@ -29,11 +31,16 @@
         android:usesCleartextTraffic="false">
 
         <activity android:name=".SetupWizardActivity" android:exported="false" />
+        <activity android:name=".UpdateExperienceActivity" android:exported="false" />
         <activity android:name=".VpnDisclosureActivity" android:exported="false" />
         <activity android:name=".PrivacyActivity" android:exported="false" />
         <activity android:name=".ScannerActivity" android:exported="false" />
         <activity android:name=".FirewallActivity" android:exported="false" />
         <activity android:name=".WireGuardActivity" android:exported="false" />
+        <activity
+            android:name=".WireGuardQrScannerActivity"
+            android:exported="false"
+            android:theme="@style/zxing_CaptureTheme" />
         <activity android:name=".XdrActivity" android:exported="false" />
         <activity android:name=".HardeningActivity" android:exported="false" />
         <activity android:name=".BehaviorActivity" android:exported="false" />

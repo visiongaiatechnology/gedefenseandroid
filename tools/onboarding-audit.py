@@ -17,8 +17,8 @@ expected = [
 missing = [name for name in expected if not re.search(rf'^\s*{name}\(', MODEL, re.M)]
 if missing:
     raise SystemExit(f'ONBOARDING_AUDIT_FAIL missing_steps={missing}')
-if 'CURRENT_WIZARD_VERSION = 2' not in SETUP:
-    raise SystemExit('ONBOARDING_AUDIT_FAIL versioned_completion')
+if 'completedMarker || legacyWizardVersion > 0' not in SETUP or 'SETUP_SCHEMA_VERSION = 2' not in SETUP:
+    raise SystemExit('ONBOARDING_AUDIT_FAIL monotonic_completion')
 required = {
     'vpn_disclosure': 'VpnDisclosureActivity::class.java',
     'privacy_center': 'PrivacyActivity::class.java',
@@ -44,4 +44,4 @@ if 'setup.markWizardCompleted()' not in ACTIVITY or 'activatePostSetupInventoryA
     raise SystemExit('ONBOARDING_AUDIT_FAIL completion_activation')
 if ACTIVITY.index('setup.markWizardCompleted()') > ACTIVITY.index('activatePostSetupInventoryAsync()'):
     raise SystemExit('ONBOARDING_AUDIT_FAIL inventory_before_consent')
-print(f'ONBOARDING_AUDIT_PASS steps={len(expected)} wizard_version=2 telemetry_shield=true')
+print(f'ONBOARDING_AUDIT_PASS steps={len(expected)} setup_schema=2 monotonic_completion=true telemetry_shield=true')
