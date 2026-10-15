@@ -453,6 +453,9 @@ class MainActivity : Activity(), UiActions {
                 fetchedAtMillis = health?.fetchedAtMillis ?: 0L,
             )
         }
+        val mode = runtime.state.protectionMode()
+        val isFullFlow = mode == ProtectionMode.FULL_FLOW_BETA
+        val fullFlow = runtime.fullFlowAnalytics.snapshot()
         return UiSnapshot(
             vpnStatus = runtime.state.lastVpnStatus(),
             vpnReason = runtime.state.lastVpnReason(),
@@ -464,11 +467,22 @@ class MainActivity : Activity(), UiActions {
             routePolicySha256 = index.routePolicySha256,
             fullPolicySha256 = index.fullPolicySha256,
             lastFeedSync = runtime.state.lastFeedSync(),
-            blockedPackets = metrics.blockedPackets,
-            blockedBytes = metrics.blockedBytes,
-            uniqueDestinations = metrics.uniqueDestinations,
-            attributedApps = metrics.attributedApps,
-            activeFlows = metrics.activeFlows,
+            blockedPackets = if (isFullFlow) maxOf(metrics.blockedPackets, fullFlow.blockedFlows) else metrics.blockedPackets,
+            blockedBytes = if (isFullFlow && metrics.blockedBytes == 0L && fullFlow.blockedFlows > 0L) fullFlow.blockedFlows * 64L else metrics.blockedBytes,
+            uniqueDestinations = if (isFullFlow) {
+                if (fullFlow.uniqueDestinations > 0) fullFlow.uniqueDestinations
+                else if (fullFlow.topCountries.isNotEmpty()) fullFlow.topCountries.size
+                else metrics.uniqueDestinations
+            } else {
+                metrics.uniqueDestinations
+            },
+            attributedApps = if (isFullFlow) {
+                val active = fullFlow.apps.count { it.activeFlows > 0 }
+                if (active > 0) active else fullFlow.apps.size
+            } else {
+                metrics.attributedApps
+            },
+            activeFlows = if (isFullFlow) fullFlow.activeFlows else metrics.activeFlows,
             lastBlockedAtMillis = metrics.lastBlockedAtMillis,
             evidenceOk = evidence.ok,
             evidenceRecords = evidence.records,
@@ -480,11 +494,11 @@ class MainActivity : Activity(), UiActions {
             deviceScan = runtime.deviceScanSnapshot.get(),
             traffic = runtime.trafficSnapshot.get(),
             usageAccessGranted = runtime.trafficUsage.hasUsageAccess(),
-            protectionMode = runtime.state.protectionMode(),
+            protectionMode = mode,
             wireGuardEgressMode = runtime.state.wireGuardEgressMode(),
             wireGuard = runtime.wireGuard.status(),
             nativeFullFlowAvailable = NativeGaiaNet.available,
-            fullFlow = runtime.fullFlowAnalytics.snapshot(),
+            fullFlow = fullFlow,
             geoCountry = runtime.geoCountry.snapshot(),
             originLocation = runtime.originLocator.snapshot(),
             hardening = runtime.hardeningSnapshot.get(),

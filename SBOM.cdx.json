@@ -2,18 +2,18 @@
   "bomFormat": "CycloneDX",
   "components": [
     {
-      "bom-ref": "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.9",
+      "bom-ref": "pkg:generic/visiongaia/gedefense-core@0.28.0-beta1",
       "name": "GeDefense Core",
-      "purl": "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.9",
+      "purl": "pkg:generic/visiongaia/gedefense-core@0.28.0-beta1",
       "type": "library",
-      "version": "0.27.8-beta.9"
+      "version": "0.28.0-beta1"
     },
     {
-      "bom-ref": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.9",
+      "bom-ref": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.28.0-beta1",
       "name": "GaiaNet V2 Android Helper",
-      "purl": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.9",
+      "purl": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.28.0-beta1",
       "type": "application",
-      "version": "0.27.8-beta.9"
+      "version": "0.28.0-beta1"
     },
     {
       "bom-ref": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24",
@@ -145,17 +145,17 @@
   "dependencies": [
     {
       "dependsOn": [
-        "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.9",
-        "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.9",
+        "pkg:generic/visiongaia/gedefense-core@0.28.0-beta1",
+        "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.28.0-beta1",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@1.9.24",
         "pkg:maven/com.journeyapps/zxing-android-embedded@4.3.0",
         "pkg:maven/com.google.zxing/core@3.5.3"
       ],
-      "ref": "pkg:generic/visiongaia/gedefense-mobile@0.27.8-beta.9"
+      "ref": "pkg:generic/visiongaia/gedefense-mobile@0.28.0-beta1"
     },
     {
       "dependsOn": [],
-      "ref": "pkg:generic/visiongaia/gedefense-core@0.27.8-beta.9"
+      "ref": "pkg:generic/visiongaia/gedefense-core@0.28.0-beta1"
     },
     {
       "dependsOn": [
@@ -166,7 +166,7 @@
         "pkg:golang/golang.org/x/term@v0.31.0",
         "pkg:golang/golang.org/x/text@v0.24.0"
       ],
-      "ref": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.27.8-beta.9"
+      "ref": "pkg:golang/visiongaia.dev/gedefense/mobile/netstack@0.28.0-beta1"
     },
     {
       "dependsOn": [],
@@ -209,16 +209,16 @@
   ],
   "metadata": {
     "component": {
-      "bom-ref": "pkg:generic/visiongaia/gedefense-mobile@0.27.8-beta.9",
+      "bom-ref": "pkg:generic/visiongaia/gedefense-mobile@0.28.0-beta1",
       "name": "VGT GeDefense Mobile",
-      "purl": "pkg:generic/visiongaia/gedefense-mobile@0.27.8-beta.9",
+      "purl": "pkg:generic/visiongaia/gedefense-mobile@0.28.0-beta1",
       "type": "application",
-      "version": "0.27.8-beta.9"
+      "version": "0.28.0-beta1"
     },
     "properties": [
       {
         "name": "visiongaia:versionCode",
-        "value": "58"
+        "value": "59"
       },
       {
         "name": "visiongaia:compileSdk",
@@ -288,7 +288,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:d3cbd641-3bae-5a32-8deb-fd57ee887d2d",
+  "serialNumber": "urn:uuid:e88db148-1267-5fb3-9b55-7027611ffc64",
   "specVersion": "1.6",
   "version": 1
 }

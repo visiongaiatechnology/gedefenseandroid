@@ -3,13 +3,17 @@
 <p align="center"><strong>Lokale Android-Endpoint-Security, Netzwerkabwehr und XDR.</strong><br>Entwickelt von VisionGaiaTechnology für Umgebungen, in denen Sicherheitstelemetrie auf dem Gerät bleiben soll.</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md"><strong>Deutsch</strong></a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/Version-0.27.8--beta.9-D8A928?style=flat-square" />
-<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-58-64748B?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/Version-0.28.0--beta1-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-59-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/Datenschutz-local--first-06B6D4?style=flat-square" />
 <img alt="License" src="https://img.shields.io/badge/Lizenz-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
+
+> [!CAUTION]
+> **Wichtiger Installationshinweis für Version 0.28.0-beta1:**
+> Falls bereits eine Vorversion von GeDefense Mobile auf dem Gerät installiert ist, muss diese vor der Installation von `0.28.0-beta1` **vollständig deinstalliert / gelöscht** werden (`Deinstallieren -> Neuinstallation`). Ein direktes Update („Drüberinstallieren“) schlägt fehl (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), da für diesen Release-Build ein aktualisierter Signaturschlüssel verwendet wurde.
 
 > [!IMPORTANT]
 > GeDefense Mobile ist aktuell ein **Public-Beta-/Pre-Production-Security-Kandidat**. Die automatisierten Release-Gates sind umfangreich; OEM-Verhalten, VPN-Lifecycle und Update-/Migrationspfade müssen vor Hochrisiko-Produktiveinsatz weiterhin auf realen Geräten geprüft werden.
@@ -111,7 +115,15 @@ Exakter Offline-/Repro-Build: [`BUILD-RUNBOOK.md`](BUILD-RUNBOOK.md).
 | Русский | [`Master Architecture - RU`](docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf) |
 | 简体中文 | [`Master Architecture - ZH-CN`](docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf) |
 
-> Das Dossier dokumentiert die VC55-Architekturbaseline. Der aktuelle Quellstand ist **0.27.8-beta.9 / VC58** und enthält zusätzlich die OEM-HMAC-Recovery-Härtung, den Threat-Policy-Selbsttest ohne Netzwerkzugriff, den überarbeiteten transaktionalen Update-Screen sowie den dreifachen WireGuard-Import über Text, Datei und lokalen QR-Scan. Er prüft den geladenen `ThreatIndex`, Block-Autorität, Routenabdeckung und den exakten GDTI-Startserialisierer; die TUN-Erfassung fremder Apps bleibt ein separater Real-Device-Gate. Für den aktuellen Implementierungsstand gelten `TOOLCHAINS.lock`, `SECURITY.md`, `CHANGELOG.md` und der Quellcode als maßgeblich.
+## Neueste Änderungen / Changelog
+
+### Version 0.28.0-beta1 (VersionCode 59) — Full-Flow XDR-Metriken & Cold-Boot-Fix
+* **Live-Dashboard & Metriken:** Behebung der statischen 0-Anzeigen im Full-Flow-Beta-Modus. Eindeutige Ziele (Bounded-Set `uniqueDestinations`), blockierte Pakete und aktive Apps (`attributedApps`) werden nun kontinuierlich in Echtzeit im Dashboard und den XDR-Kacheln erfasst und dargestellt.
+* **Onboarding & Setup-Assistent:** Behebung einer Cold-Boot-Race-Condition in `DeviceSetupManager`. Nach einem erzwungenen Beenden (Force Stop) oder Kaltstart ploppt der Einrichtungsassistent bei bereits abgeschlossenem Setup nicht mehr fälschlicherweise auf.
+* **Integrierte WireGuard-Bridge:** Volle Unterstützung für lokale Paket-Inspektion mit direktem Chaining über den integrierten WireGuard-Tunnel (Import via QR-Code-Scan, Text oder Datei).
+* **Release-Audits & Konsistenz:** Alle 12 VGT-Qualitäts- und Sicherheitsprüfungen (Durable Persistence, Main-Thread I/O, SBOM, i18n etc.) erfolgreich validiert.
+
+> Der vollständige Versionsverlauf aller Builds befindet sich in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Dokumentation
 

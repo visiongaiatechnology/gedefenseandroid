@@ -21,6 +21,7 @@ signing.properties
 # Release artifacts belong in GitHub Releases, not the source tree
 *.apk
 *.aab
+!VGT_GeDefense_Mobile_*.apk
 
 # Local logs/temp output
 *.log

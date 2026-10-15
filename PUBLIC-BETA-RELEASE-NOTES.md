@@ -1,6 +1,6 @@
-# GeDefense Mobile 0.27.8-beta.9 — Public Beta Release Notes
+# GeDefense Mobile 0.28.0-beta1 — Public Beta Release Notes
 
-`0.27.8-beta.9` / VC58 is a focused usability and update-continuity release built on the VC57 OEM-HMAC and onboarding-race fixes.
+`0.28.0-beta1` / VC59 is a focused stability and metrics release addressing Full Flow session metrics attribution and cold boot setup wizard state retention.
 
 ## Update experience
 

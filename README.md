@@ -17,8 +17,8 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.27.8--beta.9-D8A928?style=flat-square" />
-  <img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-58-64748B?style=flat-square" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.28.0--beta1-D8A928?style=flat-square" />
+  <img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-59-64748B?style=flat-square" />
   <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.24-7F52FF?style=flat-square&logo=kotlin&logoColor=white" />
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
@@ -28,6 +28,10 @@
   <img alt="Privacy" src="https://img.shields.io/badge/privacy-local--first-06B6D4?style=flat-square" />
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
+
+> [!CAUTION]
+> **Important Installation Notice for Version 0.28.0-beta1:**
+> If an earlier version of GeDefense Mobile is already installed on your device, it must be **completely uninstalled** before installing `0.28.0-beta1` (`Uninstall -> Clean Install`). Direct in-place updates will fail with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an updated signing key is used for this release build.
 
 > [!IMPORTANT]
 > GeDefense Mobile is currently a **public-beta / pre-production security candidate**. The release gates are extensive, but OEM behavior, VPN lifecycle details and update/migration paths must still be validated on real devices before high-risk production deployment.
@@ -162,7 +166,15 @@ The original master dossier is German. Translated editions are provided for repo
 | Русский | [`GeDefense Mobile - Master Architecture - RU`](docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf) |
 | 简体中文 | [`GeDefense Mobile - Master Architecture - ZH-CN`](docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf) |
 
-> The dossier documents the VC55 architecture baseline. The current source is **0.27.8-beta.9 / VC58** and additionally contains OEM-HMAC recovery hardening, the no-egress Threat Policy Self-Test, the redesigned transactional update screen and the three-path WireGuard import flow (text, document and local QR). The self-test validates the loaded `ThreatIndex`, block authority, route coverage and the exact GDTI startup serializer without opening a network connection; third-party-app/TUN capture remains a separate real-device gate. For current implementation truth, prefer `TOOLCHAINS.lock`, `SECURITY.md`, `CHANGELOG.md` and the source itself.
+## Recent Changes / Changelog
+
+### Version 0.28.0-beta1 (VersionCode 59) — Full-Flow XDR Metrics & Cold Boot Fix
+* **Live Dashboard & Metrics:** Fixed zero-value metrics in Full Flow Beta mode. Unique destinations (bounded `uniqueDestinations` set), blocked packets, and active flow apps (`attributedApps`) are now continuously aggregated and reflected in real-time across Dashboard and XDR tiles.
+* **Onboarding & Setup Wizard:** Resolved cold-boot race condition in `DeviceSetupManager`. After a force stop or cold reboot, the initial setup wizard will no longer re-appear if setup was already completed.
+* **Integrated WireGuard Bridge:** Full support for local packet inspection with direct chaining over the embedded WireGuard tunnel (import via camera QR scanner, config file, or raw text).
+* **Release Audits & Consistency:** All 12 internal VGT quality and security gates (Durable Persistence, Main-Thread I/O, SBOM, i18n, etc.) verified and passing.
+
+> For full historical release logs, see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Documentation
 
