@@ -122,5 +122,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/${GEDEFENSE_NDK_VERSION}"
           bash tools/release-readiness.sh
