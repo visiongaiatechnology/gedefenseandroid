@@ -1,3 +1,9 @@
+## 0.28.0-beta1 — full-flow XDR session metrics + cold boot setup wizard fix
+
+- Version: `0.28.0-beta1` / version code `59`.
+- Resolved Full Flow Beta UI metrics display: bounded destination IP tracking in `FullFlowAnalytics` now populates `uniqueDestinations`, live app flow tracking now drives `attributedApps` on Dashboard and Activity screens, and Dashboard Tile 3 dynamically aligns to "Eindeutige Ziele" in Full Flow mode.
+- Eliminated cold boot setup wizard race condition: `DeviceSetupManager.refreshSnapshot()` now applies platform query results via atomic `updateAndGet`, preventing background preference loading from being overwritten by stale snapshot defaults during app restart or after force close.
+
 ## 0.27.8-beta.9 — update UI + WireGuard import usability
 
 - Version: `0.27.8-beta.9` / version code `58`.

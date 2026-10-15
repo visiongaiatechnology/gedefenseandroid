@@ -3,13 +3,17 @@
 <p align="center"><strong>本地优先的 Android 终端安全、网络防御与 XDR。</strong><br>由 VisionGaiaTechnology 构建，面向希望安全遥测尽可能留在设备本地的环境。</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md"><strong>简体中文</strong></a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/version-0.27.8--beta.9-D8A928?style=flat-square" />
-<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-58-64748B?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/version-0.28.0--beta1-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-59-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/privacy-local--first-06B6D4?style=flat-square" />
 <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
+
+> [!CAUTION]
+> **0.28.0-beta1 版本的重要安装说明：**
+> 如果设备上已安装 GeDefense Mobile 的旧版本，在安装 `0.28.0-beta1` 之前必须**先彻底卸载旧版本**（`卸载旧版 -> 全新安装`）。直接覆盖更新将报错 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，因为此发布版本采用了更新的签名密钥。
 
 > [!IMPORTANT]
 > GeDefense Mobile 目前属于**公开测试版 / 预生产安全候选版本**。自动化发布门槛已经非常严格，但在高风险生产环境部署之前，仍应在真实设备上验证 OEM 行为、VPN 生命周期以及更新/迁移路径。
@@ -111,7 +115,17 @@ bash tools/release-readiness.sh
 | Русский | [`Master Architecture - RU`](docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf) |
 | 简体中文 | [`Master Architecture - ZH-CN`](docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf) |
 
-> Dossier 记录 VC55 架构 baseline。当前源码版本为 **0.27.8-beta.9 / VC58**，并新增了 OEM-HMAC 恢复连续性加固、不产生网络外发的威胁策略自检、重新设计的事务型更新界面以及三种 WireGuard 导入方式（文本、文件与本地二维码扫描）。该自检验证已加载的 `ThreatIndex`、阻断权限、路由覆盖以及启动 GaiaNet 所用的同一 GDTI 序列化路径；第三方应用的 TUN 捕获仍需在真实设备上单独验证。当前实现状态应优先参考 `TOOLCHAINS.lock`、`SECURITY.md`、`CHANGELOG.md` 与源码。
+> Dossier 记录 VC55 架构 baseline。当前源码版本为 **0.28.0-beta1 / VC59**，并新增了 OEM-HMAC 恢复连续性加固、不产生网络外发的威胁策略自检、重新设计的事务型更新界面以及三种 WireGuard 导入方式（文本、文件与本地二维码扫描）。该自检验证已加载的 `ThreatIndex`、阻断权限、路由覆盖以及启动 GaiaNet 所用的同一 GDTI 序列化路径；第三方应用的 TUN 捕获仍需在真实设备上单独验证。当前实现状态应优先参考 `TOOLCHAINS.lock`、`SECURITY.md`、`CHANGELOG.md` 与源码。
+
+## 最新更新 / Changelog
+
+### 版本 0.28.0-beta1 (VersionCode 59) — Full-Flow XDR 指标与冷启动修复
+* **实时仪表盘与统计指标：** 修复了 Full Flow Beta 模式下指标显示为 0 的问题。唯一目标 IP（有界 `uniqueDestinations` 集合）、拦截数据包数及活跃应用数（`attributedApps`）现已支持实时聚合并在仪表盘和 XDR 卡片中持续更新。
+* **引导与设置向导（Onboarding）：** 修复了 `DeviceSetupManager` 中冷启动时的竞态条件。在强制停止或冷重启后，已完成初始设置的设备不会再错误弹出设置向导。
+* **内置 WireGuard 桥接：** 完整支持本地数据包深度检测并通过内置 WireGuard 隧道直接出站（支持二维码相机扫描、配置文件导入或纯文本导入）。
+* **发布审计与一致性验证：** 全部 12 项内部 VGT 质量与安全门禁（持久化、主线程 I/O、SBOM、多语言等）均验证通过。
+
+> 完整历史版本记录请参阅 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 文档
 

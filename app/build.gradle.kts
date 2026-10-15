@@ -19,8 +19,8 @@ android {
         applicationId = "de.visiongaia.gedefense.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 58
-        versionName = "0.27.8-beta.9"
+        versionCode = 59
+        versionName = "0.28.0-beta1"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
@@ -42,7 +42,7 @@ android {
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

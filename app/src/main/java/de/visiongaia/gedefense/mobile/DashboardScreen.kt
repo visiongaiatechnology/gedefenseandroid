@@ -33,6 +33,7 @@ class DashboardScreen(
     private val activeFlowsValue: TextView
     private val sessionBlockedValue: TextView
     private val destinationsValue: TextView
+    private val destinationsLabel: TextView
     private val appsValue: TextView
     private val lastEventValue: TextView
     private val modeNotice: TextView
@@ -165,6 +166,7 @@ class DashboardScreen(
         activeFlowsValue = GeDefenseUi.displayTextView(activity, "0", 18f)
         sessionBlockedValue = GeDefenseUi.displayTextView(activity, "0", 18f)
         destinationsValue = GeDefenseUi.displayTextView(activity, "0", 18f)
+        destinationsLabel = GeDefenseUi.textView(activity, activity.getString(R.string.ui_threat_targets), 9.2f, GeDefenseUi.textMuted).apply { setPadding(0, dp(4), 0, 0) }
         appsValue = GeDefenseUi.displayTextView(activity, "0", 18f)
         lastEventValue = GeDefenseUi.textView(activity, "", 10f, GeDefenseUi.textDim)
         rootLayout.addView(sessionCard())
@@ -263,6 +265,7 @@ class DashboardScreen(
 
         activeFlowsValue.text = snapshot.activeFlows.toString()
         sessionBlockedValue.text = snapshot.blockedPackets.toString()
+        destinationsLabel.text = activity.getString(if (fullFlow) R.string.ui_unique_destinations else R.string.ui_threat_targets)
         destinationsValue.text = snapshot.uniqueDestinations.toString()
         appsValue.text = snapshot.attributedApps.toString()
         lastEventValue.text = activity.getString(
@@ -427,10 +430,22 @@ class DashboardScreen(
             addView(metricGrid(
                 xdrMetric(activeFlowsValue, activity.getString(R.string.ui_active_flows), GeDefenseUi.cyan),
                 xdrMetric(sessionBlockedValue, activity.getString(R.string.ui_blocked_packets), GeDefenseUi.red),
-                xdrMetric(destinationsValue, activity.getString(R.string.ui_threat_targets), GeDefenseUi.gold),
+                xdrMetric(destinationsValue, destinationsLabel, GeDefenseUi.gold),
                 xdrMetric(appsValue, activity.getString(R.string.ui_apps_active), GeDefenseUi.green),
             ))
             addView(lastEventValue, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        }
+        addView(content, FrameLayout.LayoutParams(-1, -2))
+    }
+
+    private fun xdrMetric(value: TextView, labelView: TextView, accent: Int): View = FrameLayout(activity).apply {
+        background = GeDefenseUi.softPanelBackground(activity, 14, accent)
+        val content = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            value.setPadding(0, 0, 0, 0)
+            addView(value)
+            addView(labelView)
         }
         addView(content, FrameLayout.LayoutParams(-1, -2))
     }

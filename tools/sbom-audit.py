@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import os
+import sys
 import uuid
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -45,7 +46,7 @@ if not (ROOT/'third_party/android/zxing/LICENSE-Apache-2.0.txt').is_file(): rais
 if properties.get('visiongaia:androidQrDependencyMode')!='offline-vendored-local-files': raise SystemExit('SBOM Android QR dependency mode mismatch')
 # Recompute the SBOM deterministically and require byte identity.
 before=BOM.read_bytes()
-proc=subprocess.run(['python3',str(ROOT/'tools/generate-sbom.py')],cwd=ROOT,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+proc=subprocess.run([sys.executable,str(ROOT/'tools/generate-sbom.py')],cwd=ROOT,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 if proc.returncode: raise SystemExit('SBOM regeneration failed: '+proc.stderr.decode(errors='replace'))
 if BOM.read_bytes()!=before: raise SystemExit('SBOM was stale or non-deterministic')
 print(f'SBOM_AUDIT_PASS components={len(components)} licenses=vendored toolchains=pinned deterministic=true')

@@ -3,13 +3,17 @@
 <p align="center"><strong>Локальная защита Android-устройств, сетевой трафик и XDR.</strong><br>Проект VisionGaiaTechnology для сред, где телеметрия безопасности должна оставаться на устройстве.</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md"><strong>Русский</strong></a> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/version-0.27.8--beta.9-D8A928?style=flat-square" />
-<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-58-64748B?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/version-0.28.0--beta1-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-59-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/privacy-local--first-06B6D4?style=flat-square" />
 <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
+
+> [!CAUTION]
+> **Важное примечание по установке версии 0.28.0-beta1:**
+> Если на вашем устройстве уже установлена предыдущая версия GeDefense Mobile, ее необходимо **полностью удалить** перед установкой `0.28.0-beta1` (`Удалить -> Чистая установка`). Прямое обновление поверх завершится ошибкой `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, так как для этой сборки релиза используется обновленный ключ подписи.
 
 > [!IMPORTANT]
 > GeDefense Mobile сейчас является **публичной beta / pre-production security candidate**. Автоматические release-gates уже строгие, но поведение OEM, жизненный цикл VPN и пути обновления/миграции необходимо дополнительно проверять на реальных устройствах перед использованием в критичных средах.
@@ -111,7 +115,15 @@ bash tools/release-readiness.sh
 | Русский | [`Master Architecture - RU`](docs/datasheets/GeDefense-Mobile-Master-Architecture-RU.pdf) |
 | 简体中文 | [`Master Architecture - ZH-CN`](docs/datasheets/GeDefense-Mobile-Master-Architecture-ZH-CN.pdf) |
 
-> Dossier фиксирует архитектурную baseline VC55. Текущий исходный код имеет версию **0.27.8-beta.9 / VC58** и дополнительно включает укрепление непрерывности OEM-HMAC, самотест политики угроз без сетевого выхода, обновлённый транзакционный экран после обновления и тройной импорт профилей WireGuard (текст, файл и локальный QR-скан). Самотест проверяет загруженный `ThreatIndex`, полномочия блокировки, покрытие маршрутом и тот же сериализатор GDTI, который используется при запуске GaiaNet; перехват трафика сторонних приложений через TUN остаётся отдельной проверкой на реальном устройстве. Для актуального состояния приоритет имеют `TOOLCHAINS.lock`, `SECURITY.md`, `CHANGELOG.md` и исходный код.
+## Последние изменения / Changelog
+
+### Версия 0.28.0-beta1 (VersionCode 59) — Метрики Full-Flow XDR и исправление холодного старта
+* **Метрики дашборда в реальном времени:** Исправлено отображение нулевых значений в режиме Full Flow Beta. Уникальные целевые IP (`uniqueDestinations`), заблокированные пакеты и активные приложения (`attributedApps`) теперь непрерывно агрегируются и отображаются на дашборде и в карточках XDR.
+* **Мастер начальной настройки (Onboarding):** Устранено состояние гонки (race condition) при холодном запуске в `DeviceSetupManager`. После принудительной остановки приложения или перезапуска мастер настройки больше не открывается повторно, если он уже был пройден.
+* **Встроенный мост WireGuard:** Полная поддержка локальной инспекции пакетов с прямой пересылкой через встроенный туннель WireGuard (импорт через QR-сканер, конфигурационный файл или текст).
+* **Аудиты релиза:** Все 12 тестов качества и безопасности VGT (Durable Persistence, Main-Thread I/O, SBOM, i18n и т. д.) успешно пройдены.
+
+> Полная история изменений доступна в файле [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Документация
 

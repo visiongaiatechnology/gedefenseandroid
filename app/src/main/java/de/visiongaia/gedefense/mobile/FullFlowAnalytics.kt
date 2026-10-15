@@ -52,11 +52,13 @@ data class FullFlowAnalyticsSnapshot(
     val topDomains: List<DomainTraffic>,
     val apps: List<AppFlowTraffic>,
     val transportErrors: Long,
+    val uniqueDestinations: Int = 0,
+    val uniqueCountries: Int = 0,
 ) {
     val totalBytes: Long get() = if (Long.MAX_VALUE - txBytes < rxBytes) Long.MAX_VALUE else txBytes + rxBytes
 
     companion object {
-        fun idle() = FullFlowAnalyticsSnapshot("IDLE", 0L, 0L, 0L, 0L, 0, 0L, 0L, 0L, emptyList(), emptyList(), emptyList(), 0L)
+        fun idle() = FullFlowAnalyticsSnapshot("IDLE", 0L, 0L, 0L, 0L, 0, 0L, 0L, 0L, emptyList(), emptyList(), emptyList(), 0L, 0, 0)
     }
 }
 
@@ -89,6 +91,7 @@ class FullFlowAnalytics(private val context: Context) {
     private val apps = LinkedHashMap<String, MutableApp>()
     private val countries = HashMap<String, MutableCountry>()
     private val domains = HashMap<String, Long>()
+    private val destinations = LinkedHashSet<String>()
     private var startedAt = 0L
     private var updatedAt = 0L
     private var txBytes = 0L
@@ -100,7 +103,7 @@ class FullFlowAnalytics(private val context: Context) {
     private var state = "IDLE"
 
     fun reset(now: Long = System.currentTimeMillis()) = synchronized(lock) {
-        flows.clear(); apps.clear(); countries.clear(); domains.clear()
+        flows.clear(); apps.clear(); countries.clear(); domains.clear(); destinations.clear()
         startedAt = now; updatedAt = now; txBytes = 0L; rxBytes = 0L
         blocked = 0L; correlated = 0L; annotated = 0L; transportErrors = 0L; state = "ACTIVE"
     }
@@ -110,8 +113,17 @@ class FullFlowAnalytics(private val context: Context) {
         updatedAt = System.currentTimeMillis(); state = "STOPPED"
     }
 
-    fun open(id: Long, owner: String, label: String, country: String, action: Int) = synchronized(lock) {
+    fun open(id: Long, owner: String, label: String, country: String, action: Int, destination: String? = null) = synchronized(lock) {
         if (flows.size >= MAX_FLOWS) return@synchronized
+        if (!destination.isNullOrBlank()) {
+            if (destination !in destinations) {
+                if (destinations.size >= MAX_DESTINATIONS) {
+                    val it = destinations.iterator()
+                    if (it.hasNext()) { it.next(); it.remove() }
+                }
+                destinations += destination.take(256)
+            }
+        }
         val app = apps.getOrPut(owner) { MutableApp(owner, label) }
         app.active = (app.active + 1).coerceAtMost(MAX_FLOWS)
         app.opened = saturatingAdd(app.opened, 1L)
@@ -141,7 +153,16 @@ class FullFlowAnalytics(private val context: Context) {
         flows.remove(id); updatedAt = System.currentTimeMillis()
     }
 
-    fun blocked(owner: String, label: String, country: String, bytes: Long) = synchronized(lock) {
+    fun blocked(owner: String, label: String, country: String, bytes: Long, destination: String? = null) = synchronized(lock) {
+        if (!destination.isNullOrBlank()) {
+            if (destination !in destinations) {
+                if (destinations.size >= MAX_DESTINATIONS) {
+                    val it = destinations.iterator()
+                    if (it.hasNext()) { it.next(); it.remove() }
+                }
+                destinations += destination.take(256)
+            }
+        }
         val app = apps.getOrPut(owner) { MutableApp(owner, label) }
         app.blocked++; blocked++
         val safe = bytes.coerceIn(0L, MAX_EVENT_BYTES)
@@ -180,6 +201,7 @@ class FullFlowAnalytics(private val context: Context) {
         FullFlowAnalyticsSnapshot(
             state, startedAt, updatedAt, txBytes, rxBytes, flows.size, blocked, correlated, annotated,
             topCountries(countries), topDomains(domains), appList, transportErrors,
+            destinations.size, countries.size,
         )
     }
 
@@ -225,6 +247,7 @@ class FullFlowAnalytics(private val context: Context) {
         const val ACTION_CORRELATE = 2
         const val ACTION_BLOCK = 3
         private const val MAX_FLOWS = 8192
+        private const val MAX_DESTINATIONS = 4096
         private const val MAX_APPS = 96
         private const val MAX_EVENT_BYTES = 65_535L
         private const val MAX_DOMAINS_PER_APP = 256
@@ -302,7 +325,7 @@ class FullFlowTelemetryReader(
         val action = p[8].toIntOrNull()?.takeIf { it in 0..3 } ?: return false
         p[9].toULongOrNull() ?: return false
         val owner = owners.resolveTuple(proto, src, sport, dst, dport) ?: "uid-unresolved"
-        runtime.fullFlowAnalytics.open(id, owner, labelFor(owner), runtime.geoCountry.lookup(dst) ?: "ZZ", action)
+        runtime.fullFlowAnalytics.open(id, owner, labelFor(owner), runtime.geoCountry.lookup(dst) ?: "ZZ", action, dst.toString())
         emitAsnEvidence(owner, dst)
         runtime.metrics.setActiveFlows(runtime.fullFlowAnalytics.activeFlowCount())
         notifyUi()
@@ -515,7 +538,7 @@ class FullFlowTelemetryReader(
         if (action != FullFlowAnalytics.ACTION_BLOCK) return false
         val owner = owners.resolveTuple(proto, src, sport, dst, dport) ?: "uid-unresolved"
         val country = runtime.geoCountry.lookup(dst) ?: "ZZ"
-        runtime.fullFlowAnalytics.blocked(owner, labelFor(owner), country, bytes)
+        runtime.fullFlowAnalytics.blocked(owner, labelFor(owner), country, bytes, dst.toString())
         runtime.metrics.recordBlockedFlow(dst.toString(), bytes, owner)
         val key = "$dst|$proto|$owner"
         if (dedupe.shouldEmit(key)) {

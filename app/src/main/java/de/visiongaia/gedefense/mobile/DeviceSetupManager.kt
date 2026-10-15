@@ -81,18 +81,19 @@ class DeviceSetupManager(context: Context) {
                 val synced = runCatching { prefs.getInt(KEY_UPDATE_SYNCED_VERSION_CODE, 0) }.getOrDefault(0).coerceAtLeast(0)
                 val pendingActivation = runCatching { prefs.getInt(KEY_PENDING_UPDATE_ACTIVATION_VERSION_CODE, 0) }.getOrDefault(0).coerceAtLeast(0)
                 val previous = cached.get()
-                val updated = previous.copy(
-                    wizardCompleted = wizard,
-                    autostartVisited = visited,
-                    lastAcknowledgedVersionCode = acknowledged,
-                    updateSyncedVersionCode = synced,
-                    pendingUpdateActivationVersionCode = pendingActivation,
-                )
+                val updated = cached.updateAndGet { current ->
+                    current.copy(
+                        wizardCompleted = wizard,
+                        autostartVisited = visited,
+                        lastAcknowledgedVersionCode = acknowledged,
+                        updateSyncedVersionCode = synced,
+                        pendingUpdateActivationVersionCode = pendingActivation,
+                    )
+                }
                 if (wizard && !completedMarker) {
                     // Self-heal installs completed by older builds that only persisted wizard_version.
                     runCatching { prefs.edit().putBoolean(KEY_WIZARD_COMPLETED, true).commit() }
                 }
-                cached.set(updated)
                 preferencesLoaded.countDown()
                 if (updated != previous) notifyListeners()
                 refreshSnapshot()
@@ -214,8 +215,7 @@ class DeviceSetupManager(context: Context) {
     }
 
     fun refreshSnapshot(): DeviceSetupSnapshot {
-        val base = cached.get()
-        val refreshed = try {
+        val platform = try {
             BoundedAndroidCall.call {
                 val activityManager = appContext.getSystemService(ActivityManager::class.java)
                 val power = appContext.getSystemService(PowerManager::class.java)
@@ -245,7 +245,7 @@ class DeviceSetupManager(context: Context) {
                 val adminActive = dpm?.isAdminActive(admin) == true
                 val ownerActive = dpm?.isDeviceOwnerApp(appContext.packageName) == true
 
-                base.copy(
+                PlatformState(
                     batteryExempt = batteryExempt,
                     batteryBackgroundRestricted = backgroundRestricted,
                     batteryReady = batteryExempt || !backgroundRestricted,
@@ -259,7 +259,7 @@ class DeviceSetupManager(context: Context) {
                 )
             }
         } catch (_: RuntimeException) {
-            base.copy(
+            PlatformState(
                 batteryExempt = false,
                 batteryBackgroundRestricted = true,
                 batteryReady = false,
@@ -272,8 +272,23 @@ class DeviceSetupManager(context: Context) {
                 platformQueryOk = false,
             )
         }
-        cached.set(refreshed)
-        if (refreshed != base) notifyListeners()
+        var previous: DeviceSetupSnapshot? = null
+        val refreshed = cached.updateAndGet { current ->
+            previous = current
+            current.copy(
+                batteryExempt = platform.batteryExempt,
+                batteryBackgroundRestricted = platform.batteryBackgroundRestricted,
+                batteryReady = platform.batteryReady,
+                allFilesAccess = platform.allFilesAccess,
+                usageAccess = platform.usageAccess,
+                notificationsAllowed = platform.notificationsAllowed,
+                coarseLocationAllowed = platform.coarseLocationAllowed,
+                deviceAdminActive = platform.deviceAdminActive,
+                deviceOwnerActive = platform.deviceOwnerActive,
+                platformQueryOk = platform.platformQueryOk,
+            )
+        }
+        if (refreshed != previous) notifyListeners()
         return refreshed
     }
 
@@ -442,6 +457,19 @@ class DeviceSetupManager(context: Context) {
         updateSyncedVersionCode = 0,
         pendingUpdateActivationVersionCode = 0,
         platformQueryOk = false,
+    )
+
+    private data class PlatformState(
+        val batteryExempt: Boolean,
+        val batteryBackgroundRestricted: Boolean,
+        val batteryReady: Boolean,
+        val allFilesAccess: Boolean,
+        val usageAccess: Boolean,
+        val notificationsAllowed: Boolean,
+        val coarseLocationAllowed: Boolean,
+        val deviceAdminActive: Boolean,
+        val deviceOwnerActive: Boolean,
+        val platformQueryOk: Boolean,
     )
 
     companion object {
