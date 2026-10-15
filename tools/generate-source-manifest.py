@@ -29,5 +29,5 @@ def files() -> list[Path]:
 rows=[]
 for path in files():
     rows.append(f'{digest(path)}  {path.relative_to(ROOT).as_posix()}')
-MANIFEST.write_text('\n'.join(rows)+'\n', encoding='utf-8')
+MANIFEST.write_bytes(('\n'.join(rows)+'\n').encode('utf-8'))
 print(f'SOURCE_MANIFEST_GENERATED files={len(rows)}')
