@@ -95,5 +95,5 @@ bom = {
 }
 
 out = ROOT / "SBOM.cdx.json"
-out.write_text(json.dumps(bom, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+out.write_bytes((json.dumps(bom, indent=2, sort_keys=True) + "\n").encode("utf-8"))
 print(f"SBOM_GENERATED components={len(components)} tools={len(tools)} path={out.name}")
