@@ -77,10 +77,10 @@ require('emitAsnEvidence(owner, dst)' in flow, 'ASN enrichment not connected to 
 
 security = (root / 'tools/security-audit.sh').read_text()
 release = (root / 'tools/release-readiness.sh').read_text()
-doc = (root / 'ASN-EVIDENCE.md').read_text()
+doc = (root / 'docs/security/ASN-EVIDENCE.md').read_text(encoding='utf-8')
 require('python3 tools/asn-evidence-audit.py' in security, 'security audit does not include ASN audit')
 require('bash tools/security-audit.sh' in release, 'release readiness no longer chains security audit')
-require('ASN-EVIDENCE.md' in release, 'release readiness does not require ASN provenance document')
+require('docs/security/ASN-EVIDENCE.md' in release, 'release readiness does not require ASN provenance document')
 for marker in ('IPtoASN', 'PDDL-1.0', 'source SHA-256', 'compiled IPv4/IPv6 index SHA-256', 'evidence_only'):
     require(marker in doc, f'ASN provenance document missing: {marker}')
 

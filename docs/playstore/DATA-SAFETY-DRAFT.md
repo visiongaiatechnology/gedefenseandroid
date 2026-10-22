@@ -21,7 +21,7 @@ Sensitive durable state in these categories is protected at rest by the local Se
 
 ## External network activity
 
-GeDefense downloads threat-intelligence/security datasets from the endpoints documented in `NETWORK-EGRESS.md`. Those remote operators necessarily observe ordinary transport-layer connection metadata such as the public source IP used for the HTTPS request. GeDefense does not append the device's observed traffic history, package inventory, scanner findings or XDR incident data to those dataset requests.
+GeDefense downloads threat-intelligence/security datasets from the endpoints documented in `../security/NETWORK-EGRESS.md`. Those remote operators necessarily observe ordinary transport-layer connection metadata such as the public source IP used for the HTTPS request. GeDefense does not append the device's observed traffic history, package inventory, scanner findings or XDR incident data to those dataset requests.
 
 ## Diagnostics
 

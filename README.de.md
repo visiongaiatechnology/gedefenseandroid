@@ -45,7 +45,7 @@ Die Architektur ist konsequent **local-first**: Sicherheitsentscheidungen erfolg
 
 Der zentrale Datenschutzgedanke ist nicht nur, dass **GeDefense selbst keine zentrale Telemetrie benötigt**. Der Telemetry Shield kann zusätzlich bekannte Tracking-, Advertising-, Analytics- und optionale Geräte-Telemetrie anderer Apps auf Netzwerk-/Policy-Ebene blockieren. GeDefense führt dabei bewusst **keine TLS-Interception** durch. Wenn eine App Funktionsdaten und Telemetrie innerhalb desselben verschlüsselten First-Party-Endpunkts mischt, behauptet GeDefense nicht, den Inhalt ohne MITM auseinanderhalten zu können.
 
-Siehe [`PRIVACY.md`](PRIVACY.md), [`NETWORK-EGRESS.md`](NETWORK-EGRESS.md) und [`SECURE-TELEMETRY-VAULT.md`](SECURE-TELEMETRY-VAULT.md).
+Siehe [`PRIVACY.md`](PRIVACY.md), [`NETWORK-EGRESS.md`](docs/security/NETWORK-EGRESS.md) und [`SECURE-TELEMETRY-VAULT.md`](docs/security/SECURE-TELEMETRY-VAULT.md).
 
 ## Architektur
 
@@ -67,7 +67,7 @@ GaiaNet V2 Data Plane (Go, separater Prozess)
 
 Der Android-Host besitzt Lifecycle, Policy, Keystore-Zugriff und UI-State. GaiaNet wird als separater Prozess aus dem Native-Library-Verzeichnis gestartet und erhält nur die für den aktiven Transportpfad erforderlichen, begrenzten File-Deskriptoren und Konfigurationsdaten. Im Paket-Hot-Path gibt es kein JNI.
 
-Aktuell gepinnt: **Go 1.26.8**, Kotlin 1.9.24, Gradle 8.7, JDK 17, Android API 36 und NDK r27c. Details: [`TOOLCHAINS.lock`](TOOLCHAINS.lock), [`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md).
+Aktuell gepinnt: **Go 1.26.8**, Kotlin 1.9.24, Gradle 8.7, JDK 17, Android API 36 und NDK r27c. Details: [`TOOLCHAINS.lock`](TOOLCHAINS.lock), [`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md).
 
 ## Sicherheitsmodell
 
@@ -83,7 +83,7 @@ Wichtige Invarianten:
 - crash-sichere authentifizierte Veröffentlichung (`stage -> fsync -> verify -> atomic replace -> directory fsync`);
 - explizite Trust Boundaries zwischen Android-Host, GaiaNet, externen Datensätzen und Plattformdiensten.
 
-Vor sensiblen Deployments: [`SECURITY.md`](SECURITY.md), [`THREAT-MODEL.md`](THREAT-MODEL.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md).
+Vor sensiblen Deployments: [`SECURITY.md`](SECURITY.md), [`THREAT-MODEL.md`](docs/security/THREAT-MODEL.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md).
 
 ## Schutzmodi
 
@@ -104,7 +104,7 @@ Kompletter Readiness-Lauf:
 bash tools/release-readiness.sh
 ```
 
-Exakter Offline-/Repro-Build: [`BUILD-RUNBOOK.md`](BUILD-RUNBOOK.md).
+Exakter Offline-/Repro-Build: [`BUILD-RUNBOOK.md`](docs/release/BUILD-RUNBOOK.md).
 
 ## Architektur-Dossier
 
@@ -127,7 +127,7 @@ Exakter Offline-/Repro-Build: [`BUILD-RUNBOOK.md`](BUILD-RUNBOOK.md).
 
 ## Dokumentation
 
-[`ARCHITECTURE.md`](ARCHITECTURE.md) · [`SECURITY.md`](SECURITY.md) · [`THREAT-MODEL.md`](THREAT-MODEL.md) · [`PRIVACY.md`](PRIVACY.md) · [`NETWORK-EGRESS.md`](NETWORK-EGRESS.md) · [`SECURE-TELEMETRY-VAULT.md`](SECURE-TELEMETRY-VAULT.md) · [`THREAT-INTELLIGENCE.md`](THREAT-INTELLIGENCE.md) · [`ASN-EVIDENCE.md`](ASN-EVIDENCE.md) · [`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md) · [`SBOM.cdx.json`](SBOM.cdx.json) · [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md)
+[`ARCHITECTURE.md`](ARCHITECTURE.md) · [`SECURITY.md`](SECURITY.md) · [`THREAT-MODEL.md`](docs/security/THREAT-MODEL.md) · [`PRIVACY.md`](PRIVACY.md) · [`NETWORK-EGRESS.md`](docs/security/NETWORK-EGRESS.md) · [`SECURE-TELEMETRY-VAULT.md`](docs/security/SECURE-TELEMETRY-VAULT.md) · [`THREAT-INTELLIGENCE.md`](docs/security/THREAT-INTELLIGENCE.md) · [`ASN-EVIDENCE.md`](docs/security/ASN-EVIDENCE.md) · [`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md) · [`SBOM.cdx.json`](SBOM.cdx.json) · [`RELEASE-CHECKLIST.md`](docs/release/RELEASE-CHECKLIST.md)
 
 ## Sicherheitsmeldungen
 

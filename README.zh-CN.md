@@ -45,7 +45,7 @@ GeDefense Mobile 是一套原生 Android 安全平台，将本地 VPN enforcemen
 
 隐私模型不仅意味着 **GeDefense 自身不依赖集中式遥测**。Telemetry Shield 还可以在网络/策略层阻止其他应用中已知的 tracking、advertising、analytics 和可选设备遥测 endpoint。GeDefense 明确**不进行 TLS 拦截**。如果应用把业务流量与遥测混在同一个加密 first-party endpoint 内，GeDefense 不会假装在不做 MITM 的情况下仍能可靠区分 payload 内容。
 
-参阅 [`PRIVACY.md`](PRIVACY.md)、[`NETWORK-EGRESS.md`](NETWORK-EGRESS.md)、[`SECURE-TELEMETRY-VAULT.md`](SECURE-TELEMETRY-VAULT.md)。
+参阅 [`PRIVACY.md`](PRIVACY.md)、[`NETWORK-EGRESS.md`](docs/security/NETWORK-EGRESS.md)、[`SECURE-TELEMETRY-VAULT.md`](docs/security/SECURE-TELEMETRY-VAULT.md)。
 
 ## 架构概览
 
@@ -67,7 +67,7 @@ GaiaNet V2 Data Plane (Go，独立进程)
 
 Android host 负责 lifecycle、policy、Keystore 访问与 UI state。GaiaNet 从 APK native-library 目录作为独立进程启动，只接收当前 transport path 所需的有界文件描述符和配置。数据包 hot path 不通过 JNI 加载。
 
-当前固定 toolchain：**Go 1.26.8**、Kotlin 1.9.24、Gradle 8.7、JDK 17、Android API 36、NDK r27c。详见 [`TOOLCHAINS.lock`](TOOLCHAINS.lock)、[`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md)。
+当前固定 toolchain：**Go 1.26.8**、Kotlin 1.9.24、Gradle 8.7、JDK 17、Android API 36、NDK r27c。详见 [`TOOLCHAINS.lock`](TOOLCHAINS.lock)、[`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md)。
 
 ## 安全模型
 
@@ -83,7 +83,7 @@ Android host 负责 lifecycle、policy、Keystore 访问与 UI state。GaiaNet �
 - crash-safe authenticated publication：`stage -> fsync -> verify -> atomic replace -> directory fsync`；
 - Android host、GaiaNet、外部数据集与 Android 平台服务之间存在明确 trust boundary。
 
-敏感环境部署前请阅读 [`SECURITY.md`](SECURITY.md)、[`THREAT-MODEL.md`](THREAT-MODEL.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md)。
+敏感环境部署前请阅读 [`SECURITY.md`](SECURITY.md)、[`THREAT-MODEL.md`](docs/security/THREAT-MODEL.md)、[`ARCHITECTURE.md`](ARCHITECTURE.md)、[`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md)。
 
 ## 保护模式
 
@@ -104,7 +104,7 @@ Android host 负责 lifecycle、policy、Keystore 访问与 UI state。GaiaNet �
 bash tools/release-readiness.sh
 ```
 
-精确的离线/可复现构建流程见 [`BUILD-RUNBOOK.md`](BUILD-RUNBOOK.md)。
+精确的离线/可复现构建流程见 [`BUILD-RUNBOOK.md`](docs/release/BUILD-RUNBOOK.md)。
 
 ## 架构 Dossier
 
@@ -129,7 +129,7 @@ bash tools/release-readiness.sh
 
 ## 文档
 
-[`ARCHITECTURE.md`](ARCHITECTURE.md) · [`SECURITY.md`](SECURITY.md) · [`THREAT-MODEL.md`](THREAT-MODEL.md) · [`PRIVACY.md`](PRIVACY.md) · [`NETWORK-EGRESS.md`](NETWORK-EGRESS.md) · [`SECURE-TELEMETRY-VAULT.md`](SECURE-TELEMETRY-VAULT.md) · [`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md) · [`SBOM.cdx.json`](SBOM.cdx.json) · [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md)
+[`ARCHITECTURE.md`](ARCHITECTURE.md) · [`SECURITY.md`](SECURITY.md) · [`THREAT-MODEL.md`](docs/security/THREAT-MODEL.md) · [`PRIVACY.md`](PRIVACY.md) · [`NETWORK-EGRESS.md`](docs/security/NETWORK-EGRESS.md) · [`SECURE-TELEMETRY-VAULT.md`](docs/security/SECURE-TELEMETRY-VAULT.md) · [`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md) · [`SBOM.cdx.json`](SBOM.cdx.json) · [`RELEASE-CHECKLIST.md`](docs/release/RELEASE-CHECKLIST.md)
 
 ## 漏洞报告
 

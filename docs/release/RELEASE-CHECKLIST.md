@@ -30,7 +30,7 @@ A release is not declared ready because an APK exists. Every applicable gate bel
 - [ ] No direct battery-optimization exemption permission is present.
 - [ ] Play declarations for VPN, package visibility and all-files access are prepared.
 - [ ] Data Safety draft is reconciled against the final binary and `NETWORK-EGRESS.md`.
-- [ ] VpnService review video is recorded from the exact release build using `VPN-REVIEW-VIDEO-SCRIPT.md`.
+- [ ] VpnService review video is recorded from the exact release build using `../playstore/VPN-REVIEW-VIDEO-SCRIPT.md`.
 - [ ] Public privacy-policy URL is live before Play submission.
 
 ## Real-device beta gates

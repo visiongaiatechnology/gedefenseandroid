@@ -35,7 +35,8 @@ for root in ROOTS:
             else:
                 hosts.add(host)
 
-doc = Path('NETWORK-EGRESS.md').read_text()
+root_dir = Path(__file__).resolve().parent.parent
+doc = (root_dir / 'docs/security/NETWORK-EGRESS.md').read_text(encoding='utf-8')
 for host in sorted(hosts):
     if f'`{host}`' not in doc:
         violations.append(f'NETWORK-EGRESS.md: missing host {host}')

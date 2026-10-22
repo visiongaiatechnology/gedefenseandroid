@@ -32,7 +32,7 @@
 <p>Device Administrator and Device Owner capabilities are used only when the user or managed-device operator explicitly provisions TITAN capabilities. Destructive actions are not automatic. Managed uninstall, wipe-related settings and managed trust-anchor installation require separate explicit operator actions in the product.</p>
 <h2>Threat-intelligence and geographic datasets</h2>
 <p>GeDefense downloads public security and geolocation datasets from configured upstream providers. These HTTPS requests do not append observed destination IPs, DNS history, package names or scanner findings. As with any Internet connection, the upstream server and intervening network may observe ordinary connection metadata such as the requesting public IP address.</p>
-<p>Runtime destinations are documented in the source repository's <code>NETWORK-EGRESS.md</code>.</p>
+<p>Runtime destinations are documented in the source repository's <code>docs/security/NETWORK-EGRESS.md</code>.</p>
 <h2>Diagnostics</h2>
 <p>Diagnostics export is explicit and uses Android's Storage Access Framework. The <code>aggregate-only-v1</code> support bundle excludes package names and app labels, IP addresses, domains, file paths, signer/APK/install hashes, packet contents, Evidence payloads and XDR incident-detail text. It contains only bounded aggregate states, counters, durations and sanitized reason codes.</p>
 <p>GeDefense does not automatically upload a diagnostic bundle.</p>

@@ -18,7 +18,7 @@ Run:
 bash tools/release-readiness.sh
 ```
 
-For Android changes also run the pinned Gradle build/lint commands in [`BUILD-RUNBOOK.md`](BUILD-RUNBOOK.md). Changes to `netstack/` must pass Go race tests and the reproducible packaged-helper comparison.
+For Android changes also run the pinned Gradle build/lint commands in [`BUILD-RUNBOOK.md`](docs/release/BUILD-RUNBOOK.md). Changes to `netstack/` must pass Go race tests and the reproducible packaged-helper comparison.
 
 ## Pull requests
 

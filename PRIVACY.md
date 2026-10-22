@@ -46,7 +46,7 @@ Device Administrator and Device Owner capabilities are used only when the user o
 
 GeDefense downloads public security, geolocation and ASN datasets from configured upstream providers. These HTTPS requests fetch whole public datasets and do not append observed destination IPs, DNS history, package names or scanner findings. ASN lookup itself is offline: the IPtoASN-derived PDDL snapshot is checksum-verified, compiled and queried locally, and ASN matches remain `evidence_only` with no XDR/enforcement authority. As with any Internet connection, the upstream server and intervening network may observe ordinary connection metadata such as the requesting public IP address.
 
-The current endpoint inventory is documented in [`NETWORK-EGRESS.md`](NETWORK-EGRESS.md).
+The current endpoint inventory is documented in [`NETWORK-EGRESS.md`](docs/security/NETWORK-EGRESS.md).
 
 ## Diagnostics
 

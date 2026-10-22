@@ -45,7 +45,7 @@ GeDefense Mobile - нативная платформа безопасности 
 
 Смысл модели приватности не только в том, что **сама GeDefense не требует централизованной телеметрии**. Telemetry Shield также может блокировать известные tracking-, advertising-, analytics- и optional-device-telemetry endpoints других приложений на сетевом/policy уровне. GeDefense сознательно **не перехватывает TLS**. Если приложение смешивает функциональный трафик и телеметрию в одном зашифрованном first-party endpoint, продукт не делает вид, что может надёжно разделить содержимое без MITM.
 
-См. [`PRIVACY.md`](PRIVACY.md), [`NETWORK-EGRESS.md`](NETWORK-EGRESS.md), [`SECURE-TELEMETRY-VAULT.md`](SECURE-TELEMETRY-VAULT.md).
+См. [`PRIVACY.md`](PRIVACY.md), [`NETWORK-EGRESS.md`](docs/security/NETWORK-EGRESS.md), [`SECURE-TELEMETRY-VAULT.md`](docs/security/SECURE-TELEMETRY-VAULT.md).
 
 ## Архитектура
 
@@ -67,7 +67,7 @@ GaiaNet V2 Data Plane (Go, отдельный процесс)
 
 Android-host управляет lifecycle, policy, Keystore и UI state. GaiaNet запускается как отдельный процесс из native-library directory APK и получает только ограниченные файловые дескрипторы/конфигурацию, необходимые выбранному transport path. JNI в packet hot path не используется.
 
-Текущий закреплённый toolchain: **Go 1.26.8**, Kotlin 1.9.24, Gradle 8.7, JDK 17, Android API 36, NDK r27c. См. [`TOOLCHAINS.lock`](TOOLCHAINS.lock), [`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md).
+Текущий закреплённый toolchain: **Go 1.26.8**, Kotlin 1.9.24, Gradle 8.7, JDK 17, Android API 36, NDK r27c. См. [`TOOLCHAINS.lock`](TOOLCHAINS.lock), [`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md).
 
 ## Модель безопасности
 
@@ -83,7 +83,7 @@ Android-host управляет lifecycle, policy, Keystore и UI state. GaiaNet
 - crash-safe authenticated publication: `stage -> fsync -> verify -> atomic replace -> directory fsync`;
 - явные trust boundaries между Android host, GaiaNet, внешними datasets и Android platform services.
 
-Перед использованием в чувствительной среде прочитайте [`SECURITY.md`](SECURITY.md), [`THREAT-MODEL.md`](THREAT-MODEL.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md).
+Перед использованием в чувствительной среде прочитайте [`SECURITY.md`](SECURITY.md), [`THREAT-MODEL.md`](docs/security/THREAT-MODEL.md), [`ARCHITECTURE.md`](ARCHITECTURE.md), [`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md).
 
 ## Режимы защиты
 
@@ -104,7 +104,7 @@ Android-host управляет lifecycle, policy, Keystore и UI state. GaiaNet
 bash tools/release-readiness.sh
 ```
 
-Точная offline/reproducible процедура: [`BUILD-RUNBOOK.md`](BUILD-RUNBOOK.md).
+Точная offline/reproducible процедура: [`BUILD-RUNBOOK.md`](docs/release/BUILD-RUNBOOK.md).
 
 ## Архитектурный dossier
 
@@ -127,7 +127,7 @@ bash tools/release-readiness.sh
 
 ## Документация
 
-[`ARCHITECTURE.md`](ARCHITECTURE.md) · [`SECURITY.md`](SECURITY.md) · [`THREAT-MODEL.md`](THREAT-MODEL.md) · [`PRIVACY.md`](PRIVACY.md) · [`NETWORK-EGRESS.md`](NETWORK-EGRESS.md) · [`SECURE-TELEMETRY-VAULT.md`](SECURE-TELEMETRY-VAULT.md) · [`SUPPLY-CHAIN.md`](SUPPLY-CHAIN.md) · [`SBOM.cdx.json`](SBOM.cdx.json) · [`RELEASE-CHECKLIST.md`](RELEASE-CHECKLIST.md)
+[`ARCHITECTURE.md`](ARCHITECTURE.md) · [`SECURITY.md`](SECURITY.md) · [`THREAT-MODEL.md`](docs/security/THREAT-MODEL.md) · [`PRIVACY.md`](PRIVACY.md) · [`NETWORK-EGRESS.md`](docs/security/NETWORK-EGRESS.md) · [`SECURE-TELEMETRY-VAULT.md`](docs/security/SECURE-TELEMETRY-VAULT.md) · [`SUPPLY-CHAIN.md`](docs/security/SUPPLY-CHAIN.md) · [`SBOM.cdx.json`](SBOM.cdx.json) · [`RELEASE-CHECKLIST.md`](docs/release/RELEASE-CHECKLIST.md)
 
 ## Сообщения об уязвимостях
 
