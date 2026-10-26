@@ -36,6 +36,12 @@
 > [!IMPORTANT]
 > GeDefense Mobile is currently a **public-beta / pre-production security candidate**. The release gates are extensive, but OEM behavior, VPN lifecycle details and update/migration paths must still be validated on real devices before high-risk production deployment.
 
+
+
+<img width="1536" height="1024" alt="GeDefense_ Real Security, Many Feathers" src="https://github.com/user-attachments/assets/5eaec804-8a2b-4163-8c62-2d5d772753b9" />
+
+
+
 ## What GeDefense is
 
 GeDefense Mobile is a native Android security platform that combines a local VPN enforcement plane, endpoint telemetry, XDR/EDR correlation, threat intelligence, app-risk analysis, encrypted evidence storage and optional Android Device Owner controls.
