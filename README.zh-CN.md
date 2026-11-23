@@ -11,6 +11,12 @@
 <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
 
+> [!TIP]
+> **下载最新版本 — `0.31.0`（`VC 62`，Android 10+）：**
+> - **GitHub APK 直接下载：** [`VGT_GeDefense_Mobile_0.31.0_VC62.apk`](https://github.com/visiongaiatechnology/gedefenseandroid/releases/download/v0.31.0/VGT_GeDefense_Mobile_0.31.0_VC62.apk)（[发布说明](https://github.com/visiongaiatechnology/gedefenseandroid/releases/tag/v0.31.0)）
+> - **GitFlic APK 直接下载：** [`VGT_GeDefense_Mobile_0.31.0_VC62.apk`](https://api.gitflic.ru/project/visiongaiatechnology/gedefense-mobile/release/310a9c4c-ba3a-4451-8a6a-2cde88fbd2fc/file/2dbe1f90-b7d5-4aa4-bbf7-578418a3b838)（[GitFlic 发布页](https://gitflic.ru/project/visiongaiatechnology/gedefense-mobile/release)）
+> - **APK SHA-256：** `3f25ccc5d1ece93952ed9263bf98c30ba9ac9a47f6c03e7c9784d6c619768445`
+
 > [!NOTE]
 > **0.31.0 (`VC 62`) 版本安装与更新说明：**
 > 已安装 `0.28.0-beta1` (`VC 59`)、`0.28.0-beta2` (`VC 60`) 或 `0.30.0` (`VC 61`) 的设备可直接覆盖升级（使用相同签名身份）。仅在 `0.28.0` 之前旧版本上才需先卸载后再全新安装。

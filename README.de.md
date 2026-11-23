@@ -11,6 +11,12 @@
 <img alt="License" src="https://img.shields.io/badge/Lizenz-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
 
+> [!TIP]
+> **Aktueller Download — Version `0.31.0` (`VC 62`, Android 10+):**
+> - **GitHub Direkt-Download (APK):** [`VGT_GeDefense_Mobile_0.31.0_VC62.apk`](https://github.com/visiongaiatechnology/gedefenseandroid/releases/download/v0.31.0/VGT_GeDefense_Mobile_0.31.0_VC62.apk) ([Release Notes](https://github.com/visiongaiatechnology/gedefenseandroid/releases/tag/v0.31.0))
+> - **GitFlic Direkt-Download (APK):** [`VGT_GeDefense_Mobile_0.31.0_VC62.apk`](https://api.gitflic.ru/project/visiongaiatechnology/gedefense-mobile/release/310a9c4c-ba3a-4451-8a6a-2cde88fbd2fc/file/2dbe1f90-b7d5-4aa4-bbf7-578418a3b838) ([GitFlic Releases](https://gitflic.ru/project/visiongaiatechnology/gedefense-mobile/release))
+> - **APK SHA-256:** `3f25ccc5d1ece93952ed9263bf98c30ba9ac9a47f6c03e7c9784d6c619768445`
+
 > [!NOTE]
 > **Installations- und Update-Hinweis für Version 0.31.0 (`VC 62`):**
 > Geräte mit bereits installiertem `0.28.0-beta1` (`VC 59`), `0.28.0-beta2` (`VC 60`) oder `0.30.0` (`VC 61`) können direkt per Update aktualisiert werden (identischer Signaturschlüssel). Nur Installationen vor `0.28.0` erfordern weiterhin eine vorherige Deinstallation (`Deinstallieren -> Neuinstallation`).
