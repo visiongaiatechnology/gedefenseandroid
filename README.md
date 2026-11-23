@@ -44,7 +44,9 @@
 
 
 
-<img width="1536" height="1024" alt="GeDefense_ Real Security, Many Feathers" src="https://github.com/user-attachments/assets/5eaec804-8a2b-4163-8c62-2d5d772753b9" />
+<p align="center">
+  <img src="Ge_Defense.png" alt="GeDefense Mobile" width="320" />
+</p>
 
 
 
