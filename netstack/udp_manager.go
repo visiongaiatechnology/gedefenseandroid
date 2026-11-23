@@ -9,13 +9,14 @@ import (
 )
 
 type udpFlow struct {
-	manager   *udpManager
-	key       flowKey
-	stats     *flowTelemetry
-	version   uint8
-	conn      *net.UDPConn
-	closed    atomic.Bool
-	closeOnce sync.Once
+	manager       *udpManager
+	key           flowKey
+	stats         *flowTelemetry
+	version       uint8
+	conn          *net.UDPConn
+	quicInspected atomic.Bool
+	closed        atomic.Bool
+	closeOnce     sync.Once
 }
 
 type udpManager struct {
@@ -59,6 +60,26 @@ func (m *udpManager) handle(p parsedPacket) {
 	}
 	if m.handlePrivacyDNS(p) {
 		return
+	}
+	var quicMeta clientHelloMetadata
+	var quicParsed bool
+	if p.DstPort != 53 && len(p.UDP.Payload) >= 64 && (existing == nil || !existing.quicInspected.Load()) {
+		if existing != nil {
+			existing.quicInspected.Store(true)
+		}
+		quicMeta, quicParsed = parseQUICInitialClientHello(p.UDP.Payload)
+		if quicParsed && quicMeta.SNI != "" && m.privacy != nil {
+			decision := m.privacy.decide(quicMeta.SNI)
+			if decision.Action != privacyAllow {
+				m.telemetry.privacy(p, quicMeta.SNI, decision)
+				if decision.Action == privacyBlock {
+					if existing != nil {
+						existing.close("privacy_quic_sni_block")
+					}
+					return
+				}
+			}
+		}
 	}
 	match := m.policy.match(p.Dst)
 	if match.Action == actionBlock {
@@ -108,6 +129,9 @@ func (m *udpManager) handle(p parsedPacket) {
 		if name := parseDNSQueryName(p.UDP.Payload); name != "" {
 			m.telemetry.dnsQuery(f.stats.ID, name)
 		}
+	} else if quicParsed {
+		f.quicInspected.Store(true)
+		m.telemetry.clientHello(f.stats.ID, quicMeta)
 	}
 	_ = f.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	if n, err := f.conn.Write(p.UDP.Payload); err == nil {
@@ -136,7 +160,7 @@ func (m *udpManager) handlePrivacyDNS(p parsedPacket) bool {
 	if decision.Action != privacyBlock {
 		return false
 	}
-	response := buildDNSBlockedResponse(p.UDP.Payload)
+	response := withDNSNegativeCacheSOA(buildDNSBlockedResponse(p.UDP.Payload), 120)
 	if len(response) == 0 {
 		return true
 	}

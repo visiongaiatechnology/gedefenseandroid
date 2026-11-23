@@ -375,9 +375,29 @@ private fun testPrivacyIntelligenceRegistry() {
                 essential = false,
                 provenance = prov,
             ),
+            PrivacyRule(
+                id = "malicious-dark-adtech-test",
+                domain = "covert.adtech.test",
+                includeSubdomains = true,
+                category = PrivacyCategory.MALICIOUS_TELEMETRY,
+                confidence = PrivacyConfidence.MEDIUM,
+                breakageRisk = PrivacyBreakageRisk.LOW,
+                essential = false,
+                provenance = prov,
+            ),
+            PrivacyRule(
+                id = "malicious-high-risk-test",
+                domain = "risky.adtech.test",
+                includeSubdomains = false,
+                category = PrivacyCategory.MALICIOUS_TELEMETRY,
+                confidence = PrivacyConfidence.HIGH,
+                breakageRisk = PrivacyBreakageRisk.HIGH,
+                essential = false,
+                provenance = prov,
+            ),
         ),
     )
-    assertEq(registry.count, 4, "privacy registry count")
+    assertEq(registry.count, 6, "privacy registry count")
     assertTrue(registry.fingerprintSha256.matches(Regex("[0-9a-f]{64}")), "privacy registry fingerprint")
     assertEq(registry.decide("metrics.example.test", PrivacyProfile.CONSERVATIVE).action, PrivacyAction.BLOCK, "conservative high-confidence analytics block")
     assertEq(registry.decide("sub.metrics.example.test", PrivacyProfile.BALANCED).action, PrivacyAction.BLOCK, "suffix rule applies to subdomain")
@@ -386,6 +406,8 @@ private fun testPrivacyIntelligenceRegistry() {
     assertEq(registry.decide("diag.example.test", PrivacyProfile.STRICT).action, PrivacyAction.BLOCK, "strict blocks bounded diagnostic telemetry")
     assertEq(registry.decide("resolver.example.test", PrivacyProfile.BALANCED).action, PrivacyAction.OBSERVE, "balanced observes encrypted DNS bootstrap")
     assertEq(registry.decide("resolver.example.test", PrivacyProfile.STRICT).action, PrivacyAction.BLOCK, "strict blocks known encrypted DNS bootstrap")
+    assertEq(registry.decide("beacon.covert.adtech.test", PrivacyProfile.CONSERVATIVE).action, PrivacyAction.BLOCK, "conservative blocks low-breakage malicious telemetry")
+    assertEq(registry.decide("risky.adtech.test", PrivacyProfile.CONSERVATIVE).action, PrivacyAction.OBSERVE, "high-breakage rule remains observe in conservative")
     assertEq(registry.decide("evilmetrics.example.test", PrivacyProfile.STRICT).action, PrivacyAction.ALLOW, "suffix boundary cannot overmatch")
     assertTrue(canonicalPrivacyDomain("A.Example.TEST.") == "a.example.test", "privacy domain canonicalization")
     assertTrue(canonicalPrivacyDomain("../example.test") == null, "privacy domain rejects invalid labels")

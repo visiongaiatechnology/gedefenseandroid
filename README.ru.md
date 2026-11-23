@@ -3,17 +3,17 @@
 <p align="center"><strong>Локальная защита Android-устройств, сетевой трафик и XDR.</strong><br>Проект VisionGaiaTechnology для сред, где телеметрия безопасности должна оставаться на устройстве.</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md">Deutsch</a> · <a href="README.ru.md"><strong>Русский</strong></a> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/version-0.28.0--beta1-D8A928?style=flat-square" />
-<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-59-64748B?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/version-0.31.0-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-62-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/privacy-local--first-06B6D4?style=flat-square" />
 <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
 
-> [!CAUTION]
-> **Важное примечание по установке версии 0.28.0-beta1:**
-> Если на вашем устройстве уже установлена предыдущая версия GeDefense Mobile, ее необходимо **полностью удалить** перед установкой `0.28.0-beta1` (`Удалить -> Чистая установка`). Прямое обновление поверх завершится ошибкой `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, так как для этой сборки релиза используется обновленный ключ подписи.
+> [!NOTE]
+> **Примечание по обновлению и установке версии 0.31.0 (`VC 62`):**
+> Устройства с установленной версией `0.28.0-beta1` (`VC 59`), `0.28.0-beta2` (`VC 60`) или `0.30.0` (`VC 61`) можно обновить напрямую поверх (ключ подписи идентичен). Чистая переустановка требуется только при обновлении со сборок до `0.28.0`.
 
 > [!IMPORTANT]
 > GeDefense Mobile сейчас является **публичной beta / pre-production security candidate**. Автоматические release-gates уже строгие, но поведение OEM, жизненный цикл VPN и пути обновления/миграции необходимо дополнительно проверять на реальных устройствах перед использованием в критичных средах.
@@ -117,11 +117,10 @@ bash tools/release-readiness.sh
 
 ## Последние изменения / Changelog
 
-### Версия 0.28.0-beta1 (VersionCode 59) — Метрики Full-Flow XDR и исправление холодного старта
-* **Метрики дашборда в реальном времени:** Исправлено отображение нулевых значений в режиме Full Flow Beta. Уникальные целевые IP (`uniqueDestinations`), заблокированные пакеты и активные приложения (`attributedApps`) теперь непрерывно агрегируются и отображаются на дашборде и в карточках XDR.
-* **Мастер начальной настройки (Onboarding):** Устранено состояние гонки (race condition) при холодном запуске в `DeviceSetupManager`. После принудительной остановки приложения или перезапуска мастер настройки больше не открывается повторно, если он уже был пройден.
-* **Встроенный мост WireGuard:** Полная поддержка локальной инспекции пакетов с прямой пересылкой через встроенный туннель WireGuard (импорт через QR-сканер, конфигурационный файл или текст).
-* **Аудиты релиза:** Все 12 тестов качества и безопасности VGT (Durable Persistence, Main-Thread I/O, SBOM, i18n и т. д.) успешно пройдены.
+### Версия 0.31.0 (VersionCode 62) — Telemetry Shield (626 правил), `MALICIOUS_TELEMETRY` и защита от Retry-Storm
+* **База Privacy Intelligence (626 правил):** Расширение [`privacy_intelligence_v1.tsv`](app/src/main/assets/privacy_intelligence_v1.tsv) с 27 до 626 проверенных правил с **34 исключениями `ESSENTIAL_*`** (FCM Push, Captive Portal, Play Integrity, OTA/Cloud) и **19 проверенными bootstrap-доменами `ENCRYPTED_DNS`** (`CONSERVATIVE`: 262 блокировки, `BALANCED`: 417, `STRICT`: 584).
+* **Блокировка скрытой и враждебной телеметрии (`MALICIOUS_TELEMETRY`):** Новая категория (30 правил: Adups/AdSunflower/AdFuture, Dark AdTech без веб-присутствия `lazybumblebee.com`/`qa-analytics.com`/Bigo-кластер, скомпрометированный `websdk.appsflyer.com`, AppMetrica, ByteDance `mssdk`, session-replay SDK) активна уже в профиле `CONSERVATIVE` и повышается до `XdrSeverity.HIGH` в `XdrEngine`.
+* **Анти-шторм DNS и офлайн GeoIP (`0.30.0`–`0.31.0`):** Записи RFC 2308 negative-cache `SOA` (`120s`) в `netstack/dns.go`, трекер `TelemetryRetryStormTracker` (`privacy.retry_storm`), Stage-2 компилятор [`tools/privacy_feed_compiler.py`](tools/privacy_feed_compiler.py), а также встроенный офлайн GeoIP-seed (IPv4/IPv6), компактная карточка уведомлений и исправления LAN/Port Sentinel из `0.30.0`.
 
 > Полная история изменений доступна в файле [`CHANGELOG.md`](CHANGELOG.md).
 

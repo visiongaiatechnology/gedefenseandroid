@@ -12,6 +12,7 @@ class BehaviorEngine(context: Context, private val xdr: XdrEngine) {
 
     fun initialize() = store.initialize()
     fun snapshot(): BehaviorSnapshot = store.snapshot()
+    fun profile(packageName: String): BehaviorProfile? = store.profile(packageName)
     fun setAutoQuarantineCritical(enabled: Boolean): Boolean = store.setAutoQuarantineCritical(enabled)
     fun resetLearning(): Boolean = synchronized(lock) { lastEvaluationMillis = 0L; store.resetLearning() }
     fun beginSession() = synchronized(lock) { lastEvaluationMillis = 0L }

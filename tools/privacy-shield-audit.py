@@ -56,6 +56,9 @@ checks = {
     'encrypted_dns_ui_boundary': 'privacy_telemetry_encrypted_dns_note' in privacy_ui,
     'wireguard_dns_enforcement': engine.find('if e.handlePrivacyDNS(packet, e.tunMTU)') != -1 and engine.find('if e.handlePrivacyDNS(packet, e.tunMTU)') < engine.find('e.wireGuard.send(raw[:packet.TotalLen]', engine.find('if e.handlePrivacyDNS(packet, e.tunMTU)')),
     'local_nxdomain': 'buildDNSBlockedResponse' in dns and '0x0003' in dns,
+    'negative_cache_soa': 'withDNSNegativeCacheSOA' in dns and 'withDNSNegativeCacheSOA' in udp and 'withDNSNegativeCacheSOA' in engine,
+    'malicious_telemetry_category': 'MALICIOUS_TELEMETRY' in model and 'MALICIOUS_TELEMETRY' in xdr,
+    'retry_storm_xdr': 'TelemetryRetryStormTracker' in analytics and 'ingestPrivacyRetryStorm' in xdr,
     'privacy_telemetry': 'func (t *telemetry) privacy' in (net / 'telemetry.go').read_text() and '"P\\t%d' in (net / 'telemetry.go').read_text(),
     'android_revalidation': 'runtime.privacyIntelligence.registry().decide(domain, runtime.state.privacyProfile())' in analytics and 'privacy.policy_desync' in analytics,
     'evidence_and_xdr': 'privacy.block' in analytics and 'runtime.xdr.ingestPrivacyDecision' in analytics and 'source = "telemetry-shield"' in xdr,
@@ -89,15 +92,32 @@ if asset.is_file():
     ids = [row[0] for row in rows]
     if len(ids) != len(set(ids)):
         raise SystemExit('PRIVACY_SHIELD_AUDIT_FAIL duplicate_asset_id')
-    forbidden_licenses = ('CC-BY-NC', 'CC BY-NC', 'PROPRIETARY')
+    forbidden_licenses = ('CC-BY-NC', 'CC BY-NC', 'PROPRIETARY', 'ODBL', 'AGPL', 'MCRAE')
     for row in rows:
         license_id = row[9].upper()
         if any(token in license_id for token in forbidden_licenses):
             raise SystemExit(f'PRIVACY_SHIELD_AUDIT_FAIL forbidden_license={row[9]}')
+    if len(rows) < 550 or len(rows) > 8192:
+        raise SystemExit(f'PRIVACY_SHIELD_AUDIT_FAIL baseline_rule_count={len(rows)}')
+    malicious = [row for row in rows if row[3] == 'MALICIOUS_TELEMETRY']
+    if len(malicious) < 20:
+        raise SystemExit(f'PRIVACY_SHIELD_AUDIT_FAIL malicious_telemetry_rules={len(malicious)}')
+    essential_rows = [row for row in rows if row[6] == 'true']
+    if len(essential_rows) < 30:
+        raise SystemExit(f'PRIVACY_SHIELD_AUDIT_FAIL essential_rules={len(essential_rows)}')
     encrypted = [row for row in rows if row[3] == 'ENCRYPTED_DNS']
     if len(encrypted) < 6:
         raise SystemExit(f'PRIVACY_SHIELD_AUDIT_FAIL encrypted_dns_rules={len(encrypted)}')
-    allowed_reference_hosts = {'developers.google.com', 'developers.cloudflare.com', 'docs.quad9.net'}
+    allowed_reference_hosts = {
+        'developers.google.com',
+        'developers.cloudflare.com',
+        'docs.quad9.net',
+        'umbrella.cisco.com',
+        'mullvad.net',
+        'adguard-dns.io',
+        'docs.controld.com',
+        'my.nextdns.io',
+    }
     for row in encrypted:
         if row[9] != 'REFERENCE' or urlparse(row[8]).hostname not in allowed_reference_hosts:
             raise SystemExit(f'PRIVACY_SHIELD_AUDIT_FAIL encrypted_dns_provenance={row[0]}')
@@ -105,4 +125,4 @@ if asset.is_file():
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
     raise SystemExit('PRIVACY_SHIELD_AUDIT_FAIL ' + ','.join(failed))
-print(f'PRIVACY_SHIELD_AUDIT_PASS local_first=true rules={len(rows)} dns_enforcement=true encrypted_dns=true dot_doq_853=true no_tls_mitm=true direct=true wireguard=true evidence=true xdr=true profile_ui=true')
+print(f'PRIVACY_SHIELD_AUDIT_PASS local_first=true rules={len(rows)} malicious={len(malicious)} essential={len(essential_rows)} encrypted_dns={len(encrypted)} dns_enforcement=true negative_cache_soa=true retry_storm_xdr=true dot_doq_853=true no_tls_mitm=true direct=true wireguard=true evidence=true xdr=true profile_ui=true')

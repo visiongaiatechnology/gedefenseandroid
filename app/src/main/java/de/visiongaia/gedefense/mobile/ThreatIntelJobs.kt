@@ -8,7 +8,8 @@ import android.content.Context
 object ThreatIntelJobs{
     private const val JOB_ID=0x4744
     fun schedule(context:Context){
-        val scheduler=context.getSystemService(JobScheduler::class.java)
+        val scheduler=context.getSystemService(JobScheduler::class.java) ?: return
+        if (scheduler.getPendingJob(JOB_ID) != null) return
         val info=JobInfo.Builder(JOB_ID,ComponentName(context,ThreatIntelJobService::class.java))
             .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPersisted(true)
             .setPeriodic(60*60*1000L,15*60*1000L).build()

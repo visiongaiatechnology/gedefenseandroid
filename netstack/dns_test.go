@@ -48,3 +48,35 @@ func TestBuildDNSBlockedResponse(t *testing.T) {
 		t.Fatal("blocked response counts invalid")
 	}
 }
+
+func TestWithDNSNegativeCacheSOA(t *testing.T) {
+	q := []byte{
+		0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x03, 'w', 'w', 'w', 0x07, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 0x03, 'c', 'o', 'm', 0x00,
+		0x00, 0x01, 0x00, 0x01,
+	}
+	base := buildDNSBlockedResponse(q)
+	cached := withDNSNegativeCacheSOA(base, 120)
+	if len(cached) <= len(base) {
+		t.Fatalf("expected SOA record appended, got len=%d", len(cached))
+	}
+	if binary.BigEndian.Uint16(cached[8:10]) != 1 {
+		t.Fatalf("expected NSCOUNT=1, got %d", binary.BigEndian.Uint16(cached[8:10]))
+	}
+	rrStart := len(base)
+	if binary.BigEndian.Uint16(cached[rrStart:rrStart+2]) != 0xc00c {
+		t.Fatalf("expected pointer to question at 0xc00c")
+	}
+	if binary.BigEndian.Uint16(cached[rrStart+2:rrStart+4]) != 6 {
+		t.Fatalf("expected TYPE=SOA (6)")
+	}
+	if binary.BigEndian.Uint32(cached[rrStart+6:rrStart+10]) != 120 {
+		t.Fatalf("expected SOA TTL=120")
+	}
+	if binary.BigEndian.Uint32(cached[len(cached)-4:]) != 120 {
+		t.Fatalf("expected SOA Minimum=120")
+	}
+	if got := withDNSNegativeCacheSOA(nil, 120); got != nil {
+		t.Fatalf("expected nil pass-through")
+	}
+}

@@ -92,6 +92,7 @@ interface UiActions {
     fun refreshTrafficUsage()
     fun openUsageAccessSettings()
     fun requestTrafficMapLocation()
+    fun openTrafficAtlas()
     fun setProtectionMode(mode: ProtectionMode)
     fun navigateTo(index: Int)
 }

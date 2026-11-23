@@ -126,14 +126,29 @@ class XdrEngine(
         val safeConfidence = confidence.trim().uppercase().take(16)
         val safeRule = ruleId.trim().take(96)
         val packageName = owner.substringBefore(',').takeIf { it.contains('.') && !it.startsWith("uid-") }
+        val hostileTelemetry = safeAction == "BLOCK" && safeCategory == "MALICIOUS_TELEMETRY"
+        val severity = when {
+            hostileTelemetry -> XdrSeverity.HIGH
+            safeAction == "BLOCK" -> XdrSeverity.MEDIUM
+            else -> XdrSeverity.INFO
+        }
+        val threatClass = if (safeCategory == "MALICIOUS_TELEMETRY") "malicious_telemetry" else "standard_telemetry"
         emit(
             category = XdrCategory.NETWORK,
-            severity = if (safeAction == "BLOCK") XdrSeverity.MEDIUM else XdrSeverity.INFO,
+            severity = severity,
             source = "telemetry-shield",
             subject = packageName ?: owner.take(120),
-            title = if (safeAction == "BLOCK") "Telemetry endpoint blocked" else "Telemetry endpoint observed",
+            title = when {
+                hostileTelemetry -> "Hostile telemetry / covert SDK endpoint blocked"
+                safeAction == "BLOCK" -> "Telemetry endpoint blocked"
+                else -> "Telemetry endpoint observed"
+            },
             detail = "domain=$safeDomain; action=$safeAction; category=$safeCategory; confidence=$safeConfidence; rule=$safeRule",
-            riskPoints = if (safeAction == "BLOCK") 12 else 0,
+            riskPoints = when {
+                hostileTelemetry -> 35
+                safeAction == "BLOCK" -> 12
+                else -> 0
+            },
             incidentKey = packageName?.let { "app:$it" } ?: "privacy:${owner.take(120)}",
             packageName = packageName,
             dedupeKey = "privacy:$owner:$safeDomain:$safeAction:$safeRule",
@@ -144,6 +159,38 @@ class XdrEngine(
                 XdrForensicFact("privacy_category", safeCategory),
                 XdrForensicFact("privacy_confidence", safeConfidence),
                 XdrForensicFact("privacy_rule", safeRule),
+                XdrForensicFact("privacy_threat_class", threatClass),
+            ),
+        )
+    }
+
+    fun ingestPrivacyRetryStorm(
+        owner: String,
+        domain: String,
+        category: String,
+        hitCount: Int,
+        windowSeconds: Int,
+    ) {
+        val safeDomain = domain.trim().lowercase().take(253)
+        val safeCategory = category.trim().uppercase().take(48)
+        val packageName = owner.substringBefore(',').takeIf { it.contains('.') && !it.startsWith("uid-") }
+        emit(
+            category = XdrCategory.NETWORK,
+            severity = XdrSeverity.HIGH,
+            source = "telemetry-shield",
+            subject = packageName ?: owner.take(120),
+            title = "Telemetry retry storm suppressed",
+            detail = "domain=$safeDomain; category=$safeCategory; hits=$hitCount; window_s=$windowSeconds",
+            riskPoints = if (safeCategory == "MALICIOUS_TELEMETRY") 40 else 25,
+            incidentKey = packageName?.let { "app:$it" } ?: "privacy:${owner.take(120)}",
+            packageName = packageName,
+            dedupeKey = "privacy-storm:$owner:$safeDomain",
+            dedupeMs = 15L * 60L * 1000L,
+            forensicFacts = listOf(
+                XdrForensicFact("privacy_domain", safeDomain),
+                XdrForensicFact("privacy_category", safeCategory),
+                XdrForensicFact("retry_hits", hitCount.toString()),
+                XdrForensicFact("retry_window_seconds", windowSeconds.toString()),
             ),
         )
     }

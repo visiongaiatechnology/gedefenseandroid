@@ -19,8 +19,8 @@ android {
         applicationId = "de.visiongaia.gedefense.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 59
-        versionName = "0.28.0-beta1"
+        versionCode = 62
+        versionName = "0.31.0"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }

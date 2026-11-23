@@ -37,16 +37,18 @@ class PortSentinel(
     private var selector: Selector? = null
     private var worker: Thread? = null
     private var currentNetwork: Network? = null
+    private var boundAddresses: List<String> = emptyList()
     private val lastEmitted = LinkedHashMap<String, Long>(256, 0.75f, true)
     private val sourceWindows = LinkedHashMap<String, SourceWindow>(128, 0.75f, true)
     private var minuteStartedAt = 0L
     private var minuteEvents = 0
 
     fun rebind(network: Network?) = synchronized(lock) {
-        if (network == currentNetwork && running.get()) return@synchronized
-        stopLocked()
-        currentNetwork = network
         if (network == null) {
+            if (currentNetwork == null && !running.get()) return@synchronized
+            stopLocked()
+            currentNetwork = null
+            boundAddresses = emptyList()
             onState(PortSentinelRuntimeState.standby())
             return@synchronized
         }
@@ -57,10 +59,6 @@ class PortSentinel(
             capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "CELLULAR"
             else -> "UNSUPPORTED"
         }
-        if (transport == "UNSUPPORTED") {
-            onState(PortSentinelRuntimeState(false, 0, emptyList(), transport))
-            return@synchronized
-        }
         val link = connectivity.getLinkProperties(network)
         val bindAddresses = link?.linkAddresses.orEmpty()
             .asSequence()
@@ -70,6 +68,16 @@ class PortSentinel(
             .take(MAX_LOCAL_ADDRESSES)
             .toList()
         val localAddresses = bindAddresses.map(::normalizedAddress)
+        if (network == currentNetwork && running.get() && localAddresses == boundAddresses) {
+            return@synchronized
+        }
+        stopLocked()
+        currentNetwork = network
+        boundAddresses = emptyList()
+        if (transport == "UNSUPPORTED") {
+            onState(PortSentinelRuntimeState(false, 0, emptyList(), transport))
+            return@synchronized
+        }
         if (bindAddresses.isEmpty()) {
             onState(PortSentinelRuntimeState(false, 0, emptyList(), transport, "no_bindable_unicast_address"))
             return@synchronized
@@ -92,6 +100,7 @@ class PortSentinel(
             return@synchronized
         }
         selector = newSelector
+        boundAddresses = localAddresses
         running.set(true)
         worker = Thread({ eventLoop(newSelector, localAddresses, transport) }, "gedefense-port-sentinel").apply {
             isDaemon = true
@@ -245,6 +254,7 @@ class PortSentinel(
     override fun close() = synchronized(lock) {
         stopLocked()
         currentNetwork = null
+        boundAddresses = emptyList()
         onState(PortSentinelRuntimeState.standby())
     }
 

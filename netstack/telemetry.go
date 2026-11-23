@@ -82,6 +82,28 @@ func (t *telemetry) dnsQuery(flowID uint64, name string) {
 	t.emit(fmt.Sprintf("D\t%d\t%s\n", flowID, name))
 }
 
+func (t *telemetry) clientHello(flowID uint64, meta clientHelloMetadata) {
+	if flowID == 0 || (len(meta.SNI) == 0 && len(meta.JA4) == 0) {
+		return
+	}
+	if len(meta.SNI) > 0 && len(meta.SNI) <= 253 {
+		t.dnsQuery(flowID, meta.SNI)
+	}
+	sni := meta.SNI
+	if sni == "" {
+		sni = "-"
+	}
+	alpn := meta.ALPN
+	if alpn == "" {
+		alpn = "-"
+	}
+	ech := 0
+	if meta.ECH {
+		ech = 1
+	}
+	t.emit(fmt.Sprintf("H\t%d\t%s\t%s\t%s\t%s\t%s\t%d\n", flowID, meta.Transport, sni, alpn, meta.JA4, meta.JA3Hash, ech))
+}
+
 func (t *telemetry) privacy(p parsedPacket, domain string, decision privacyDecision) {
 	if len(domain) == 0 || len(domain) > 253 || len(decision.RuleID) < 3 || len(decision.RuleID) > 96 {
 		return

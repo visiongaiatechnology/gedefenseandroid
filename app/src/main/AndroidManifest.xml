@@ -44,6 +44,7 @@
         <activity android:name=".XdrActivity" android:exported="false" />
         <activity android:name=".HardeningActivity" android:exported="false" />
         <activity android:name=".BehaviorActivity" android:exported="false" />
+        <activity android:name=".TrafficAtlasActivity" android:exported="false" />
         <activity android:name=".NetworkDiscoveryActivity" android:exported="false" />
         <activity android:name=".PortSentinelActivity" android:exported="false" />
         <activity android:name=".TitanActivity" android:exported="false" />

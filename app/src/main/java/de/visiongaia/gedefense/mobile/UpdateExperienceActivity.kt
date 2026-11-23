@@ -150,17 +150,17 @@ class UpdateExperienceActivity : Activity() {
 
         val statusPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(
-                dp(GeDefenseUi.CARD_CONTENT_PADDING_HORIZONTAL_DP),
-                dp(GeDefenseUi.CARD_CONTENT_PADDING_VERTICAL_DP),
-                dp(GeDefenseUi.CARD_CONTENT_PADDING_HORIZONTAL_DP),
-                dp(GeDefenseUi.CARD_CONTENT_PADDING_VERTICAL_DP),
-            )
             background = GeDefenseUi.glassPanelBackground(
                 this@UpdateExperienceActivity,
                 strong = true,
                 accent = GeDefenseUi.cyan,
                 radius = 20,
+            )
+            setPadding(
+                dp(GeDefenseUi.CARD_CONTENT_PADDING_HORIZONTAL_DP),
+                dp(GeDefenseUi.CARD_CONTENT_PADDING_VERTICAL_DP),
+                dp(GeDefenseUi.CARD_CONTENT_PADDING_HORIZONTAL_DP),
+                dp(GeDefenseUi.CARD_CONTENT_PADDING_VERTICAL_DP),
             )
         }
         statusPanel.addView(GeDefenseUi.sectionTitle(this, getString(R.string.update_experience_security_check)))
@@ -180,13 +180,13 @@ class UpdateExperienceActivity : Activity() {
 
         val actionDock = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(12), dp(12), dp(12))
             background = GeDefenseUi.glassPanelBackground(
                 this@UpdateExperienceActivity,
                 strong = true,
                 accent = GeDefenseUi.gold,
                 radius = 22,
             )
+            setPadding(dp(14), dp(14), dp(14), dp(14))
         }
 
         actionButton = buildActionButton()
@@ -235,8 +235,8 @@ class UpdateExperienceActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             minimumHeight = dp(54)
-            setPadding(dp(18), dp(13), dp(18), dp(13))
             background = GeDefenseUi.goldButtonBackground(this@UpdateExperienceActivity)
+            setPadding(dp(18), dp(13), dp(18), dp(13))
             isClickable = true
             isFocusable = true
             setOnClickListener { beginUpdateFlow() }
@@ -265,16 +265,16 @@ class UpdateExperienceActivity : Activity() {
     private fun featureCard(index: String, title: String, body: String, accent: Int): View {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            background = GeDefenseUi.glassPanelBackground(
+                this@UpdateExperienceActivity,
+                accent = accent,
+                radius = 19,
+            )
             setPadding(
                 dp(GeDefenseUi.CARD_CONTENT_PADDING_HORIZONTAL_DP),
                 dp(GeDefenseUi.CARD_CONTENT_PADDING_VERTICAL_DP),
                 dp(GeDefenseUi.CARD_CONTENT_PADDING_HORIZONTAL_DP),
                 dp(GeDefenseUi.CARD_CONTENT_PADDING_VERTICAL_DP),
-            )
-            background = GeDefenseUi.glassPanelBackground(
-                this@UpdateExperienceActivity,
-                accent = accent,
-                radius = 19,
             )
         }
         val heading = LinearLayout(this).apply {

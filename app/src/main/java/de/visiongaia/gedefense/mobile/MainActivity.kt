@@ -90,6 +90,7 @@ class MainActivity : Activity(), UiActions {
             return
         }
         runtime.refreshOriginLocationAsync { runOnUiThread { if (!isFinishing && !isDestroyed) refresh() } }
+        runtime.maybeAutoSyncThreatFeeds()
         if (runtime.state.isVpnActive()) {
             runtime.setup.completePendingUpdateAfterProtection()
             try {
@@ -252,6 +253,10 @@ class MainActivity : Activity(), UiActions {
 
     override fun openBehaviorCenter() {
         startActivity(Intent(this, BehaviorActivity::class.java))
+    }
+
+    override fun openTrafficAtlas() {
+        startActivity(Intent(this, TrafficAtlasActivity::class.java))
     }
 
     override fun configureAlwaysOnProtection() {
@@ -532,6 +537,7 @@ class MainActivity : Activity(), UiActions {
                 RuntimeFailureLog.nonCritical("manual-geo-sync", error)
                 runtime.geoCountry.snapshot()
             }
+            if (geo.ready) runtime.fullFlowAnalytics.reclassifyUnknownCountries(runtime.geoCountry::lookup)
             if (report != null) runtime.refreshFeedHealth()
             runOnUiThread {
                 syncing = false

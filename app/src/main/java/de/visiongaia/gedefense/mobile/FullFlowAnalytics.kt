@@ -66,8 +66,9 @@ class FullFlowAnalytics(private val context: Context) {
     private data class FlowMeta(
         val owner: String,
         val label: String,
-        val country: String,
+        var country: String,
         val action: Int,
+        val destinationIp: IpAddress? = null,
         var tx: Long = 0L,
         var rx: Long = 0L,
     )
@@ -92,6 +93,9 @@ class FullFlowAnalytics(private val context: Context) {
     private val countries = HashMap<String, MutableCountry>()
     private val domains = HashMap<String, Long>()
     private val destinations = LinkedHashSet<String>()
+    private val historyBuckets = LinkedHashMap<Long, HourlyHistoryBucket>()
+    private data class UnresolvedSample(val owner: String, val ip: IpAddress, var bytes: Long = 0L, var flows: Int = 0)
+    private val unresolvedClosed = LinkedHashMap<Pair<String, IpAddress>, UnresolvedSample>()
     private var startedAt = 0L
     private var updatedAt = 0L
     private var txBytes = 0L
@@ -102,8 +106,98 @@ class FullFlowAnalytics(private val context: Context) {
     private var transportErrors = 0L
     private var state = "IDLE"
 
+    private class HourlyHistoryBucket(
+        val hourStartMillis: Long,
+        val apps: MutableMap<String, MutableApp> = HashMap(),
+        val countries: MutableMap<String, MutableCountry> = HashMap(),
+        val domains: MutableMap<String, Long> = HashMap(),
+        var txBytes: Long = 0L,
+        var rxBytes: Long = 0L,
+        var blockedFlows: Long = 0L,
+    )
+
+    private fun currentBucketLocked(now: Long = System.currentTimeMillis()): HourlyHistoryBucket {
+        val hourKey = (now / HOUR_MS) * HOUR_MS
+        historyBuckets[hourKey]?.let { return it }
+        while (historyBuckets.size >= MAX_HISTORY_HOURS) {
+            val oldest = historyBuckets.keys.minOrNull() ?: break
+            historyBuckets.remove(oldest)
+        }
+        return HourlyHistoryBucket(hourKey).also { historyBuckets[hourKey] = it }
+    }
+
+    fun snapshotForWindow(windowHours: Int, now: Long = System.currentTimeMillis()): FullFlowAnalyticsSnapshot = synchronized(lock) {
+        if (windowHours <= 0) return@synchronized snapshotLocked()
+        val cutoff = now - windowHours.toLong() * HOUR_MS
+        val mergedApps = LinkedHashMap<String, MutableApp>()
+        val mergedCountries = HashMap<String, MutableCountry>()
+        val mergedDomains = HashMap<String, Long>()
+        var wTx = 0L
+        var wRx = 0L
+        var wBlocked = 0L
+        var earliest = 0L
+
+        for (bucket in historyBuckets.values) {
+            if (bucket.hourStartMillis + HOUR_MS < cutoff) continue
+            if (earliest == 0L || bucket.hourStartMillis < earliest) earliest = bucket.hourStartMillis
+            wTx = saturatingAdd(wTx, bucket.txBytes)
+            wRx = saturatingAdd(wRx, bucket.rxBytes)
+            wBlocked = saturatingAdd(wBlocked, bucket.blockedFlows)
+            for ((cc, c) in bucket.countries) {
+                val target = mergedCountries.getOrPut(cc) { MutableCountry() }
+                target.bytes = saturatingAdd(target.bytes, c.bytes)
+                target.flows += c.flows
+            }
+            for ((dom, q) in bucket.domains) {
+                mergedDomains[dom] = saturatingAdd(mergedDomains[dom] ?: 0L, q)
+            }
+            for ((owner, srcApp) in bucket.apps) {
+                val dstApp = mergedApps.getOrPut(owner) { MutableApp(owner, srcApp.label) }
+                dstApp.tx = saturatingAdd(dstApp.tx, srcApp.tx)
+                dstApp.rx = saturatingAdd(dstApp.rx, srcApp.rx)
+                dstApp.opened = saturatingAdd(dstApp.opened, srcApp.opened)
+                dstApp.blocked = saturatingAdd(dstApp.blocked, srcApp.blocked)
+                for ((cc, c) in srcApp.countries) {
+                    val target = dstApp.countries.getOrPut(cc) { MutableCountry() }
+                    target.bytes = saturatingAdd(target.bytes, c.bytes)
+                    target.flows += c.flows
+                }
+                for ((dom, q) in srcApp.domains) {
+                    dstApp.domains[dom] = saturatingAdd(dstApp.domains[dom] ?: 0L, q)
+                }
+            }
+        }
+        val appList = mergedApps.values.asSequence()
+            .map { app ->
+                AppFlowTraffic(
+                    app.owner, app.label, app.tx, app.rx, apps[app.owner]?.active ?: 0, app.opened, app.blocked, 0L, 0L,
+                    topCountries(app.countries), topDomains(app.domains),
+                )
+            }
+            .sortedByDescending { it.totalBytes }
+            .take(MAX_APPS)
+            .toList()
+        FullFlowAnalyticsSnapshot(
+            state = state,
+            startedAtMillis = if (earliest > 0L) earliest else startedAt,
+            updatedAtMillis = updatedAt,
+            txBytes = wTx,
+            rxBytes = wRx,
+            activeFlows = flows.size,
+            blockedFlows = wBlocked,
+            correlatedFlows = correlated,
+            annotatedFlows = annotated,
+            topCountries = topCountries(mergedCountries),
+            topDomains = topDomains(mergedDomains),
+            apps = appList,
+            transportErrors = transportErrors,
+            uniqueDestinations = destinations.size,
+            uniqueCountries = mergedCountries.size,
+        )
+    }
+
     fun reset(now: Long = System.currentTimeMillis()) = synchronized(lock) {
-        flows.clear(); apps.clear(); countries.clear(); domains.clear(); destinations.clear()
+        flows.clear(); apps.clear(); countries.clear(); domains.clear(); destinations.clear(); unresolvedClosed.clear()
         startedAt = now; updatedAt = now; txBytes = 0L; rxBytes = 0L
         blocked = 0L; correlated = 0L; annotated = 0L; transportErrors = 0L; state = "ACTIVE"
     }
@@ -113,7 +207,7 @@ class FullFlowAnalytics(private val context: Context) {
         updatedAt = System.currentTimeMillis(); state = "STOPPED"
     }
 
-    fun open(id: Long, owner: String, label: String, country: String, action: Int, destination: String? = null) = synchronized(lock) {
+    fun open(id: Long, owner: String, label: String, country: String, action: Int, destination: String? = null, destinationIp: IpAddress? = null) = synchronized(lock) {
         if (flows.size >= MAX_FLOWS) return@synchronized
         if (!destination.isNullOrBlank()) {
             if (destination !in destinations) {
@@ -129,9 +223,14 @@ class FullFlowAnalytics(private val context: Context) {
         app.opened = saturatingAdd(app.opened, 1L)
         if (action == ACTION_CORRELATE) { app.correlated++; correlated++ }
         if (action == ACTION_ANNOTATE) { app.annotated++; annotated++ }
-        flows[id] = FlowMeta(owner, label, country, action)
+        flows[id] = FlowMeta(owner, label, country, action, destinationIp)
         countries.getOrPut(country) { MutableCountry() }.flows++
         app.countries.getOrPut(country) { MutableCountry() }.flows++
+        val bucket = currentBucketLocked()
+        bucket.countries.getOrPut(country) { MutableCountry() }.flows++
+        val hApp = bucket.apps.getOrPut(owner) { MutableApp(owner, label) }
+        hApp.opened = saturatingAdd(hApp.opened, 1L)
+        hApp.countries.getOrPut(country) { MutableCountry() }.flows++
         updatedAt = System.currentTimeMillis()
     }
 
@@ -149,6 +248,16 @@ class FullFlowAnalytics(private val context: Context) {
         val dtx = (txTotal.coerceAtLeast(0L) - flow.tx).coerceAtLeast(0L)
         val drx = (rxTotal.coerceAtLeast(0L) - flow.rx).coerceAtLeast(0L)
         addBytes(flow.owner, flow.country, dtx, drx)
+        if (flow.country == "ZZ" && flow.destinationIp != null) {
+            val key = flow.owner to flow.destinationIp
+            if (unresolvedClosed.size >= MAX_DESTINATIONS && key !in unresolvedClosed) {
+                val it = unresolvedClosed.iterator()
+                if (it.hasNext()) { it.next(); it.remove() }
+            }
+            val sample = unresolvedClosed.getOrPut(key) { UnresolvedSample(flow.owner, flow.destinationIp) }
+            sample.bytes = saturatingAdd(sample.bytes, saturatingAdd(flow.tx, flow.rx))
+            sample.flows++
+        }
         apps[flow.owner]?.let { it.active = (it.active - 1).coerceAtLeast(0) }
         flows.remove(id); updatedAt = System.currentTimeMillis()
     }
@@ -169,6 +278,14 @@ class FullFlowAnalytics(private val context: Context) {
         app.tx = saturatingAdd(app.tx, safe); txBytes = saturatingAdd(txBytes, safe)
         app.countries.getOrPut(country) { MutableCountry() }.apply { this.bytes = saturatingAdd(this.bytes, safe); flows++ }
         countries.getOrPut(country) { MutableCountry() }.apply { this.bytes = saturatingAdd(this.bytes, safe); flows++ }
+        val bucket = currentBucketLocked()
+        bucket.blockedFlows = saturatingAdd(bucket.blockedFlows, 1L)
+        bucket.txBytes = saturatingAdd(bucket.txBytes, safe)
+        bucket.countries.getOrPut(country) { MutableCountry() }.apply { this.bytes = saturatingAdd(this.bytes, safe); flows++ }
+        val hApp = bucket.apps.getOrPut(owner) { MutableApp(owner, label) }
+        hApp.blocked = saturatingAdd(hApp.blocked, 1L)
+        hApp.tx = saturatingAdd(hApp.tx, safe)
+        hApp.countries.getOrPut(country) { MutableCountry() }.apply { this.bytes = saturatingAdd(this.bytes, safe); flows++ }
         updatedAt = System.currentTimeMillis()
     }
 
@@ -180,6 +297,39 @@ class FullFlowAnalytics(private val context: Context) {
         domains[safe] = saturatingAdd(domains[safe] ?: 0L, 1L)
         trimCounterMap(app.domains, MAX_DOMAINS_PER_APP)
         trimCounterMap(domains, MAX_GLOBAL_DOMAINS)
+        val bucket = currentBucketLocked()
+        bucket.domains[safe] = saturatingAdd(bucket.domains[safe] ?: 0L, 1L)
+        trimCounterMap(bucket.domains, MAX_GLOBAL_DOMAINS)
+        val hApp = bucket.apps.getOrPut(flow.owner) { MutableApp(flow.owner, flow.label) }
+        hApp.domains[safe] = saturatingAdd(hApp.domains[safe] ?: 0L, 1L)
+        trimCounterMap(hApp.domains, MAX_DOMAINS_PER_APP)
+        updatedAt = System.currentTimeMillis()
+    }
+
+    fun clientHello(
+        id: Long,
+        @Suppress("UNUSED_PARAMETER") transport: String,
+        sni: String?,
+        @Suppress("UNUSED_PARAMETER") alpn: String?,
+        @Suppress("UNUSED_PARAMETER") ja4: String,
+        @Suppress("UNUSED_PARAMETER") ja3: String,
+        @Suppress("UNUSED_PARAMETER") ech: Boolean,
+    ) = synchronized(lock) {
+        val flow = flows[id] ?: return@synchronized
+        if (!sni.isNullOrBlank()) {
+            val safe = normalizeDomain(sni)
+            if (safe != null) {
+                val app = apps[flow.owner]
+                if (app != null && safe !in app.domains) {
+                    app.domains[safe] = saturatingAdd(app.domains[safe] ?: 0L, 1L)
+                    trimCounterMap(app.domains, MAX_DOMAINS_PER_APP)
+                }
+                if (safe !in domains) {
+                    domains[safe] = saturatingAdd(domains[safe] ?: 0L, 1L)
+                    trimCounterMap(domains, MAX_GLOBAL_DOMAINS)
+                }
+            }
+        }
         updatedAt = System.currentTimeMillis()
     }
 
@@ -187,7 +337,57 @@ class FullFlowAnalytics(private val context: Context) {
 
     fun activeFlowCount(): Int = synchronized(lock) { flows.size }
 
+    fun reclassifyUnknownCountries(lookup: (IpAddress) -> String?) = synchronized(lock) {
+        for (flow in flows.values) {
+            if (flow.country != "ZZ") continue
+            val resolved = lookup(flow.destinationIp ?: continue) ?: continue
+            if (resolved == "ZZ") continue
+            val flowBytes = saturatingAdd(flow.tx, flow.rx)
+            flow.country = resolved
+            moveCountryStats(countries, "ZZ", resolved, flowBytes, 1)
+            apps[flow.owner]?.let { app -> moveCountryStats(app.countries, "ZZ", resolved, flowBytes, 1) }
+            historyBuckets.values.forEach { bucket ->
+                if ("ZZ" in bucket.countries) moveCountryStats(bucket.countries, "ZZ", resolved, flowBytes, 1)
+                bucket.apps[flow.owner]?.let { hApp ->
+                    if ("ZZ" in hApp.countries) moveCountryStats(hApp.countries, "ZZ", resolved, flowBytes, 1)
+                }
+            }
+        }
+        val iterator = unresolvedClosed.iterator()
+        while (iterator.hasNext()) {
+            val sample = iterator.next().value
+            val resolved = lookup(sample.ip) ?: continue
+            if (resolved == "ZZ") continue
+            moveCountryStats(countries, "ZZ", resolved, sample.bytes, sample.flows)
+            apps[sample.owner]?.let { app -> moveCountryStats(app.countries, "ZZ", resolved, sample.bytes, sample.flows) }
+            historyBuckets.values.forEach { bucket ->
+                if ("ZZ" in bucket.countries) moveCountryStats(bucket.countries, "ZZ", resolved, sample.bytes, sample.flows)
+                bucket.apps[sample.owner]?.let { hApp ->
+                    if ("ZZ" in hApp.countries) moveCountryStats(hApp.countries, "ZZ", resolved, sample.bytes, sample.flows)
+                }
+            }
+            iterator.remove()
+        }
+        updatedAt = System.currentTimeMillis()
+    }
+
+    private fun moveCountryStats(map: MutableMap<String, MutableCountry>, from: String, to: String, bytes: Long, flowsDelta: Int) {
+        val src = map[from] ?: return
+        val moveBytes = bytes.coerceIn(0L, src.bytes)
+        val moveFlows = flowsDelta.coerceIn(0, src.flows)
+        src.bytes = (src.bytes - moveBytes).coerceAtLeast(0L)
+        src.flows = (src.flows - moveFlows).coerceAtLeast(0)
+        if (src.flows == 0 && src.bytes == 0L) map.remove(from)
+        val dst = map.getOrPut(to) { MutableCountry() }
+        dst.bytes = saturatingAdd(dst.bytes, moveBytes)
+        dst.flows += moveFlows
+    }
+
     fun snapshot(): FullFlowAnalyticsSnapshot = synchronized(lock) {
+        snapshotLocked()
+    }
+
+    private fun snapshotLocked(): FullFlowAnalyticsSnapshot {
         val appList = apps.values.asSequence()
             .map { app ->
                 AppFlowTraffic(
@@ -198,7 +398,7 @@ class FullFlowAnalytics(private val context: Context) {
             .sortedByDescending { it.totalBytes }
             .take(MAX_APPS)
             .toList()
-        FullFlowAnalyticsSnapshot(
+        return FullFlowAnalyticsSnapshot(
             state, startedAt, updatedAt, txBytes, rxBytes, flows.size, blocked, correlated, annotated,
             topCountries(countries), topDomains(domains), appList, transportErrors,
             destinations.size, countries.size,
@@ -212,6 +412,16 @@ class FullFlowAnalytics(private val context: Context) {
         val total = saturatingAdd(dtx, drx)
         app.countries.getOrPut(country) { MutableCountry() }.bytes = saturatingAdd(app.countries[country]?.bytes ?: 0L, total)
         countries.getOrPut(country) { MutableCountry() }.bytes = saturatingAdd(countries[country]?.bytes ?: 0L, total)
+        if (total > 0L) {
+            val bucket = currentBucketLocked()
+            bucket.txBytes = saturatingAdd(bucket.txBytes, dtx)
+            bucket.rxBytes = saturatingAdd(bucket.rxBytes, drx)
+            bucket.countries.getOrPut(country) { MutableCountry() }.bytes = saturatingAdd(bucket.countries[country]?.bytes ?: 0L, total)
+            val hApp = bucket.apps.getOrPut(owner) { MutableApp(owner, app.label) }
+            hApp.tx = saturatingAdd(hApp.tx, dtx)
+            hApp.rx = saturatingAdd(hApp.rx, drx)
+            hApp.countries.getOrPut(country) { MutableCountry() }.bytes = saturatingAdd(hApp.countries[country]?.bytes ?: 0L, total)
+        }
     }
 
     private fun topCountries(source: Map<String, MutableCountry>): List<CountryTraffic> = source.entries.asSequence()
@@ -252,6 +462,8 @@ class FullFlowAnalytics(private val context: Context) {
         private const val MAX_EVENT_BYTES = 65_535L
         private const val MAX_DOMAINS_PER_APP = 256
         private const val MAX_GLOBAL_DOMAINS = 1024
+        private const val MAX_HISTORY_HOURS = 168
+        private const val HOUR_MS = 60L * 60L * 1000L
     }
 }
 
@@ -260,6 +472,7 @@ class FullFlowTelemetryReader(
     context: Context,
     private val runtime: AppRuntime,
     private val descriptor: ParcelFileDescriptor,
+    private val onBlockObserved: (() -> Unit)? = null,
     private val onFatal: (String) -> Unit,
 ) : AutoCloseable {
     private val appContext = context.applicationContext
@@ -268,6 +481,7 @@ class FullFlowTelemetryReader(
     private val expectedClose = AtomicBoolean(false)
     private val dedupe = EventDedupe(cap = 4096, windowMs = 60_000L)
     private val asnDedupe = EventDedupe(cap = 8192, windowMs = 6L * 60L * 60L * 1000L)
+    private val retryStorms = TelemetryRetryStormTracker()
     private val readerThread = Thread(::loop, "gedefense-fullflow-telemetry").apply { isDaemon = true }
     private val main = Handler(Looper.getMainLooper())
     private var lastBehaviorEvaluationMillis = 0L
@@ -306,6 +520,7 @@ class FullFlowTelemetryReader(
             "C" -> handleClose(p)
             "B" -> handleBlocked(p)
             "D" -> handleDns(p)
+            "H" -> handleClientHello(p)
             "P" -> handlePrivacy(p)
             "Y" -> handleEncryptedDns(p)
             "Q" -> handlePackageQuarantine(p)
@@ -325,7 +540,11 @@ class FullFlowTelemetryReader(
         val action = p[8].toIntOrNull()?.takeIf { it in 0..3 } ?: return false
         p[9].toULongOrNull() ?: return false
         val owner = owners.resolveTuple(proto, src, sport, dst, dport) ?: "uid-unresolved"
-        runtime.fullFlowAnalytics.open(id, owner, labelFor(owner), runtime.geoCountry.lookup(dst) ?: "ZZ", action, dst.toString())
+        val resolvedCountry = runtime.geoCountry.lookup(dst)
+        if (resolvedCountry == null && !runtime.geoCountry.snapshot().ready) {
+            runtime.ensureGeoCountryReadyAsync()
+        }
+        runtime.fullFlowAnalytics.open(id, owner, labelFor(owner), resolvedCountry ?: "ZZ", action, dst.toString(), dst)
         emitAsnEvidence(owner, dst)
         runtime.metrics.setActiveFlows(runtime.fullFlowAnalytics.activeFlowCount())
         notifyUi()
@@ -366,6 +585,21 @@ class FullFlowTelemetryReader(
         return true
     }
 
+    private fun handleClientHello(p: List<String>): Boolean {
+        if (p.size != 8) return false
+        val id = p[1].toLongOrNull() ?: return false
+        val transport = p[2].takeIf { it == "tls" || it == "quic" } ?: return false
+        val sni = p[3].takeIf { it == "-" || it.length in 1..253 } ?: return false
+        val alpn = p[4].takeIf { it == "-" || it.length in 1..32 } ?: return false
+        val ja4 = p[5].takeIf { it.length in 1..64 } ?: return false
+        val ja3 = p[6].takeIf { it.length in 1..64 } ?: return false
+        val ech = p[7] == "1"
+        runtime.fullFlowAnalytics.clientHello(id, transport, sni.takeIf { it != "-" }, alpn.takeIf { it != "-" }, ja4, ja3, ech)
+        maybeEvaluateBehavior()
+        notifyUi()
+        return true
+    }
+
     private fun handlePrivacy(p: List<String>): Boolean {
         if (p.size != 9) return false
         val nativeAction = p[1].toIntOrNull()?.takeIf { it in 1..2 } ?: return false
@@ -400,9 +634,39 @@ class FullFlowTelemetryReader(
             return true
         }
         val owner = owners.resolveTuple(proto, src, sport, dst, dport) ?: "uid-unresolved"
+        val blocked = decision.action == PrivacyAction.BLOCK
+        if (blocked) {
+            val country = runtime.geoCountry.lookup(dst) ?: "ZZ"
+            runtime.fullFlowAnalytics.blocked(owner, labelFor(owner), country, 64L, domain)
+            runtime.metrics.recordBlockedFlow(domain, 64L, owner)
+            onBlockObserved?.invoke()
+            val stormHits = retryStorms.recordBlockedHit("$owner:$domain")
+            if (stormHits != null) {
+                try {
+                    runtime.evidence.append(
+                        EvidenceEvent(
+                            type = "privacy.retry_storm",
+                            severity = "high",
+                            subject = domain,
+                            detail = "app=$owner category=${decision.category.name} hits=$stormHits window_s=60 rule=${decision.ruleId}",
+                        ),
+                    )
+                } catch (error: Exception) { RuntimeFailureLog.nonCritical("full-flow-analytics", error) }
+                try {
+                    runtime.xdr.ingestPrivacyRetryStorm(
+                        owner = owner,
+                        domain = domain,
+                        category = decision.category.name,
+                        hitCount = stormHits,
+                        windowSeconds = 60,
+                    )
+                } catch (_: Exception) {
+                    runtime.state.recordXdrPersistenceFailure("write_failed")
+                }
+            }
+        }
         val eventKey = "privacy:$owner:$domain:${decision.action.name}"
         if (dedupe.shouldEmit(eventKey)) {
-            val blocked = decision.action == PrivacyAction.BLOCK
             try {
                 runtime.evidence.append(
                     EvidenceEvent(
@@ -426,7 +690,7 @@ class FullFlowTelemetryReader(
                 runtime.state.recordXdrPersistenceFailure("write_failed")
             }
         }
-        notifyUi(force = decision.action == PrivacyAction.BLOCK)
+        notifyUi(force = blocked)
         return true
     }
 
@@ -464,6 +728,12 @@ class FullFlowTelemetryReader(
         }
         val owner = owners.resolveTuple(proto, src, sport, dst, dport) ?: "uid-unresolved"
         val blocked = nativeAction == 2
+        if (blocked) {
+            val country = runtime.geoCountry.lookup(dst) ?: "ZZ"
+            runtime.fullFlowAnalytics.blocked(owner, labelFor(owner), country, 64L, dst.toString())
+            runtime.metrics.recordBlockedFlow(dst.toString(), 64L, owner)
+            onBlockObserved?.invoke()
+        }
         val eventKey = "encrypted-dns:$owner:$transport:${profile.name}:$blocked"
         if (dedupe.shouldEmit(eventKey)) {
             try {
@@ -502,7 +772,10 @@ class FullFlowTelemetryReader(
         val dport = p[6].toIntOrNull()?.takeIf { it in 1..65535 } ?: return false
         val bytes = p[7].toLongOrNull()?.coerceIn(0L, 65_535L) ?: return false
         val owner = owners.resolveTuple(proto, src, sport, dst, dport) ?: "uid-unresolved"
+        val country = runtime.geoCountry.lookup(dst) ?: "ZZ"
+        runtime.fullFlowAnalytics.blocked(owner, labelFor(owner), country, bytes, dst.toString())
         runtime.metrics.recordBlockedFlow(dst.toString(), bytes, owner)
+        onBlockObserved?.invoke()
         val key = "package-egress:$owner:$dst:$proto:$dport"
         if (dedupe.shouldEmit(key)) {
             try {
@@ -540,6 +813,7 @@ class FullFlowTelemetryReader(
         val country = runtime.geoCountry.lookup(dst) ?: "ZZ"
         runtime.fullFlowAnalytics.blocked(owner, labelFor(owner), country, bytes, dst.toString())
         runtime.metrics.recordBlockedFlow(dst.toString(), bytes, owner)
+        onBlockObserved?.invoke()
         val key = "$dst|$proto|$owner"
         if (dedupe.shouldEmit(key)) {
             val feeds = feedNames(bits.toLong())
@@ -634,6 +908,33 @@ class FullFlowTelemetryReader(
     companion object {
         private const val UI_NOTIFY_MIN_INTERVAL_MS = 500L
         private const val LABEL_CACHE_CAPACITY = 512
+    }
+
+    private class TelemetryRetryStormTracker(
+        private val maxKeys: Int = 512,
+        private val windowMillis: Long = 60_000L,
+        private val threshold: Int = 25,
+    ) {
+        private data class Bucket(var windowStartMs: Long, var count: Int, var reportedInWindow: Boolean)
+
+        private val buckets = object : LinkedHashMap<String, Bucket>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bucket>?): Boolean = size > maxKeys
+        }
+
+        @Synchronized
+        fun recordBlockedHit(key: String, nowMs: Long = SystemClock.elapsedRealtime()): Int? {
+            val entry = buckets[key]
+            if (entry == null || nowMs - entry.windowStartMs >= windowMillis) {
+                buckets[key] = Bucket(nowMs, 1, false)
+                return null
+            }
+            entry.count++
+            if (entry.count >= threshold && !entry.reportedInWindow) {
+                entry.reportedInWindow = true
+                return entry.count
+            }
+            return null
+        }
     }
 
     override fun close() {

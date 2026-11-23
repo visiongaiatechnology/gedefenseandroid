@@ -6,6 +6,7 @@ enum class PrivacyCategory {
     ADS,
     ANALYTICS,
     DEVICE_TELEMETRY,
+    MALICIOUS_TELEMETRY,
     CRASH_REPORTING,
     DIAGNOSTICS,
     ATTRIBUTION,
@@ -203,9 +204,10 @@ class PrivacyIntelligenceRegistry private constructor(
             return when (profile) {
                 PrivacyProfile.OFF -> PrivacyAction.ALLOW
                 PrivacyProfile.CONSERVATIVE -> if (
-                    rule.confidence == PrivacyConfidence.HIGH &&
-                    rule.breakageRisk == PrivacyBreakageRisk.LOW &&
-                    rule.category in CONSERVATIVE_BLOCK_CATEGORIES
+                    rule.breakageRisk == PrivacyBreakageRisk.LOW && (
+                        (rule.confidence == PrivacyConfidence.HIGH && rule.category in CONSERVATIVE_BLOCK_CATEGORIES) ||
+                        (rule.confidence != PrivacyConfidence.LOW && rule.category == PrivacyCategory.MALICIOUS_TELEMETRY)
+                    )
                 ) PrivacyAction.BLOCK else PrivacyAction.OBSERVE
                 PrivacyProfile.BALANCED -> if (
                     rule.confidence != PrivacyConfidence.LOW &&
@@ -269,7 +271,8 @@ class PrivacyIntelligenceRegistry private constructor(
             PrivacyCategory.ANALYTICS,
             PrivacyCategory.ATTRIBUTION,
         )
-        private val BALANCED_BLOCK_CATEGORIES = CONSERVATIVE_BLOCK_CATEGORIES + PrivacyCategory.DEVICE_TELEMETRY
+        private val BALANCED_BLOCK_CATEGORIES =
+            CONSERVATIVE_BLOCK_CATEGORIES + PrivacyCategory.DEVICE_TELEMETRY + PrivacyCategory.MALICIOUS_TELEMETRY
     }
 }
 

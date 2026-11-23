@@ -18,6 +18,14 @@ import java.nio.charset.StandardCharsets
  * resets the policy. Quarantine and allowlist updates are committed in one authenticated snapshot
  * so they cannot diverge after a crash or concurrent response action.
  */
+enum class AppEgressRule {
+    ALLOW_ALL,
+    LAN_ONLY,
+    NO_BACKGROUND,
+    NO_NEW_DOMAINS,
+    BLOCK_ALL,
+}
+
 class FirewallPolicyStore(context: Context) {
     private val lock = Any()
     private val appContext = context.applicationContext
@@ -36,6 +44,7 @@ class FirewallPolicyStore(context: Context) {
     @Volatile private var integrityReason: String? = "firewall_policy_initializing"
     private var allowedState = linkedSetOf<String>()
     private var quarantineState = linkedSetOf<String>()
+    private var smartRulesState = linkedMapOf<String, AppEgressRule>()
 
     fun initialize() = loadOrMigrate()
 
@@ -45,6 +54,8 @@ class FirewallPolicyStore(context: Context) {
         val systemApp: Boolean,
         val internetCapable: Boolean,
         val allowed: Boolean,
+        val smartRule: AppEgressRule = AppEgressRule.ALLOW_ALL,
+        val quarantined: Boolean = false,
     )
 
     fun integrityOk(): Boolean = policyIntegrityOk
@@ -64,6 +75,46 @@ class FirewallPolicyStore(context: Context) {
     }
 
     fun hasQuarantinedPackages(): Boolean = synchronized(lock) { policyIntegrityOk && quarantineState.isNotEmpty() }
+
+    fun hasActiveEgressGatePolicies(): Boolean = synchronized(lock) {
+        policyIntegrityOk && (quarantineState.isNotEmpty() || smartRulesState.values.any { it != AppEgressRule.ALLOW_ALL })
+    }
+
+    fun smartRule(packageName: String): AppEgressRule = synchronized(lock) {
+        if (!policyIntegrityOk || !validPackageName(packageName)) return@synchronized AppEgressRule.ALLOW_ALL
+        if (packageName in quarantineState) AppEgressRule.BLOCK_ALL
+        else smartRulesState[packageName] ?: AppEgressRule.ALLOW_ALL
+    }
+
+    fun smartRulesSnapshot(): Map<String, AppEgressRule> = synchronized(lock) {
+        if (!policyIntegrityOk) return@synchronized emptyMap()
+        val out = LinkedHashMap<String, AppEgressRule>(smartRulesState.size + quarantineState.size)
+        for ((pkg, rule) in smartRulesState) {
+            if (rule != AppEgressRule.ALLOW_ALL) out[pkg] = rule
+        }
+        for (pkg in quarantineState) {
+            out[pkg] = AppEgressRule.BLOCK_ALL
+        }
+        out
+    }
+
+    fun setSmartRule(packageName: String, rule: AppEgressRule): Boolean = synchronized(lock) {
+        if (!policyIntegrityOk || !validPackageName(packageName) || packageName == appContext.packageName) return@synchronized false
+        val nextAllowed = LinkedHashSet(allowedState)
+        val nextQuarantine = LinkedHashSet(quarantineState)
+        val nextRules = LinkedHashMap(smartRulesState)
+        if (rule == AppEgressRule.ALLOW_ALL) {
+            nextRules.remove(packageName)
+            nextQuarantine.remove(packageName)
+        } else {
+            if (nextRules.size >= MAX_SMART_RULES && packageName !in nextRules) return@synchronized false
+            nextRules[packageName] = rule
+            if (rule == AppEgressRule.BLOCK_ALL) {
+                nextAllowed.remove(packageName)
+            }
+        }
+        commit(nextAllowed, nextQuarantine, nextRules)
+    }
 
     fun isQuarantined(packageName: String): Boolean = synchronized(lock) {
         policyIntegrityOk && validPackageName(packageName) && packageName in quarantineState
@@ -103,23 +154,31 @@ class FirewallPolicyStore(context: Context) {
     }
 
     fun pruneMissingPackages(): Int = synchronized(lock) {
-        if (!policyIntegrityOk || (allowedState.isEmpty() && quarantineState.isEmpty())) return@synchronized 0
+        if (!policyIntegrityOk || (allowedState.isEmpty() && quarantineState.isEmpty() && smartRulesState.isEmpty())) return@synchronized 0
         // One bounded PackageManager snapshot avoids interpreting a transient per-package Binder
         // failure as proof that an app vanished. No policy is pruned when inventory is unavailable.
         val installed = installedPackageNames() ?: return@synchronized 0
         val retainedAllowed = allowedState.filterTo(LinkedHashSet()) { it in installed }
         val retainedQuarantine = quarantineState.filterTo(LinkedHashSet()) { it in installed }
-        if (retainedAllowed == allowedState && retainedQuarantine == quarantineState) return@synchronized 0
-        val removed = (allowedState.size - retainedAllowed.size) + (quarantineState.size - retainedQuarantine.size)
-        if (!commit(retainedAllowed, retainedQuarantine)) return@synchronized 0
+        val retainedRules = LinkedHashMap<String, AppEgressRule>().apply {
+            for ((pkg, rule) in smartRulesState) {
+                if (pkg in installed && rule != AppEgressRule.ALLOW_ALL) put(pkg, rule)
+            }
+        }
+        if (retainedAllowed == allowedState && retainedQuarantine == quarantineState && retainedRules == smartRulesState) return@synchronized 0
+        val removed = (allowedState.size - retainedAllowed.size) +
+            (quarantineState.size - retainedQuarantine.size) +
+            (smartRulesState.size - retainedRules.size)
+        if (!commit(retainedAllowed, retainedQuarantine, retainedRules)) return@synchronized 0
         removed
     }
 
     fun resetPolicy(): Boolean = synchronized(lock) {
-        val ok = writeState(emptySet(), emptySet())
+        val ok = writeState(emptySet(), emptySet(), emptyMap())
         if (ok) {
             allowedState.clear()
             quarantineState.clear()
+            smartRulesState.clear()
             policyIntegrityOk = true
             integrityReason = null
             legacyPrefs().edit().clear().apply()
@@ -130,6 +189,8 @@ class FirewallPolicyStore(context: Context) {
     fun appEntries(): List<AppEntry> {
         pruneMissingPackages()
         val allowed = allowedPackages()
+        val quarantined = quarantinedPackages()
+        val rules = smartRulesSnapshot()
         val flags = PackageManager.GET_PERMISSIONS
         val packages = if (Build.VERSION.SDK_INT >= 33) {
             pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(flags.toLong()))
@@ -148,7 +209,9 @@ class FirewallPolicyStore(context: Context) {
                     app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP == 0
                 val label = try { pm.getApplicationLabel(app).toString().take(140) }
                 catch (_: RuntimeException) { pkg.packageName }
-                AppEntry(pkg.packageName, label, system, internet, pkg.packageName in allowed)
+                val isQuarantined = pkg.packageName in quarantined
+                val rule = if (isQuarantined) AppEgressRule.BLOCK_ALL else (rules[pkg.packageName] ?: AppEgressRule.ALLOW_ALL)
+                AppEntry(pkg.packageName, label, system, internet, pkg.packageName in allowed, rule, isQuarantined)
             }
             .sortedWith(compareBy<AppEntry> { it.systemApp }.thenBy { it.label.lowercase() }.thenBy { it.packageName })
             .take(MAX_LISTED_PACKAGES)
@@ -165,6 +228,7 @@ class FirewallPolicyStore(context: Context) {
                     } else {
                         allowedState = decoded.first
                         quarantineState = decoded.second
+                        smartRulesState = decoded.third
                         policyIntegrityOk = true
                         integrityReason = null
                         legacyPrefs().edit().clear().apply()
@@ -183,12 +247,13 @@ class FirewallPolicyStore(context: Context) {
             .asSequence().map(String::trim).filter(::validPackageName).filter { it != appContext.packageName }
             .take(MAX_QUARANTINED_PACKAGES).toCollection(LinkedHashSet())
         allowed.removeAll(quarantine)
-        if (!writeState(allowed, quarantine)) {
+        if (!writeState(allowed, quarantine, emptyMap())) {
             failClosed("policy migration write failed")
             return
         }
         allowedState = allowed
         quarantineState = quarantine
+        smartRulesState = linkedMapOf()
         policyIntegrityOk = true
         integrityReason = null
         legacyPrefs().edit().clear().apply()
@@ -197,26 +262,42 @@ class FirewallPolicyStore(context: Context) {
     /** Legacy preferences are acquired only during explicit background migration. */
     private fun legacyPrefs() = appContext.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
 
-    private fun commit(nextAllowed: LinkedHashSet<String>, nextQuarantine: LinkedHashSet<String>): Boolean {
+    private fun commit(
+        nextAllowed: LinkedHashSet<String>,
+        nextQuarantine: LinkedHashSet<String>,
+        nextRules: LinkedHashMap<String, AppEgressRule> = LinkedHashMap(smartRulesState),
+    ): Boolean {
         nextAllowed.removeAll(nextQuarantine)
-        if (!writeState(nextAllowed, nextQuarantine)) return false
+        if (!writeState(nextAllowed, nextQuarantine, nextRules)) return false
         allowedState = nextAllowed
         quarantineState = nextQuarantine
+        smartRulesState = nextRules
         return true
     }
 
-    private fun writeState(allowed: Set<String>, quarantine: Set<String>): Boolean {
+    private fun writeState(
+        allowed: Set<String>,
+        quarantine: Set<String>,
+        smartRules: Map<String, AppEgressRule>,
+    ): Boolean {
         return try {
+            val rulesJson = JSONObject()
+            smartRules.entries.asSequence()
+                .filter { validPackageName(it.key) && it.key != appContext.packageName && it.value != AppEgressRule.ALLOW_ALL }
+                .sortedBy { it.key }
+                .take(MAX_SMART_RULES)
+                .forEach { (pkg, rule) -> rulesJson.put(pkg, rule.name) }
             val root = JSONObject()
                 .put("version", 2)
                 .put("allowed", JSONArray(allowed.sorted().take(MAX_ALLOWED_PACKAGES)))
                 .put("quarantined", JSONArray(quarantine.sorted().take(MAX_QUARANTINED_PACKAGES)))
+                .put("smartRules", rulesJson)
             val bytes = root.toString().toByteArray(StandardCharsets.UTF_8)
             if (bytes.size > MAX_POLICY_BYTES) false else { snapshotStore.write(bytes); true }
         } catch (_: Exception) { false }
     }
 
-    private fun decode(payload: ByteArray): Pair<LinkedHashSet<String>, LinkedHashSet<String>>? {
+    private fun decode(payload: ByteArray): Triple<LinkedHashSet<String>, LinkedHashSet<String>, LinkedHashMap<String, AppEgressRule>>? {
         return try {
             if (payload.size > MAX_POLICY_BYTES) null
             else {
@@ -225,12 +306,26 @@ class FirewallPolicyStore(context: Context) {
                 else {
                     val allowed = jsonPackages(root.optJSONArray("allowed"), MAX_ALLOWED_PACKAGES)
                     val quarantine = jsonPackages(root.optJSONArray("quarantined"), MAX_QUARANTINED_PACKAGES)
+                    val rules = jsonSmartRules(root.optJSONObject("smartRules"), MAX_SMART_RULES)
                     allowed.removeAll(quarantine)
-                    allowed to quarantine
+                    Triple(allowed, quarantine, rules)
                 }
             }
         } catch (_: Exception) { null }
     }
+
+    private fun jsonSmartRules(obj: JSONObject?, limit: Int): LinkedHashMap<String, AppEgressRule> =
+        linkedMapOf<String, AppEgressRule>().also { out ->
+            if (obj == null) return@also
+            val keys = obj.keys()
+            while (keys.hasNext() && out.size < limit) {
+                val pkg = keys.next().trim()
+                if (!validPackageName(pkg) || pkg == appContext.packageName) continue
+                val rawRule = obj.optString(pkg, "").trim()
+                val rule = runCatching { AppEgressRule.valueOf(rawRule) }.getOrNull() ?: continue
+                if (rule != AppEgressRule.ALLOW_ALL) out[pkg] = rule
+            }
+        }
 
     private fun jsonPackages(array: JSONArray?, limit: Int): LinkedHashSet<String> = linkedSetOf<String>().also { out ->
         if (array == null) return@also
@@ -242,6 +337,7 @@ class FirewallPolicyStore(context: Context) {
     private fun failClosed(reason: String) {
         allowedState.clear()
         quarantineState.clear()
+        smartRulesState.clear()
         policyIntegrityOk = false
         integrityReason = reason.take(160)
     }
@@ -268,6 +364,7 @@ class FirewallPolicyStore(context: Context) {
         private const val LEGACY_KEY_QUARANTINED = "quarantined_packages"
         const val MAX_ALLOWED_PACKAGES = 512
         const val MAX_QUARANTINED_PACKAGES = 256
+        const val MAX_SMART_RULES = 512
         private const val MAX_LISTED_PACKAGES = 1024
         private const val MAX_POLICY_BYTES = 256 * 1024
     }

@@ -17,7 +17,12 @@ internal object WireGuardConfigParser {
     private const val MAX_DNS_SERVERS = 4
     private const val MAX_ALLOWED_IPS = 64
 
-    private val edgeFormatChars = setOf('\uFEFF', '\u200B', '\u200C', '\u200D', '\u2060')
+    private val edgeFormatChars = setOf(
+        '\uFEFF', '\u200B', '\u200C', '\u200D', '\u200E', '\u200F',
+        '\u202A', '\u202B', '\u202C', '\u202D', '\u202E',
+        '\u2060', '\u2061', '\u2062', '\u2063', '\u2064',
+        '\u2066', '\u2067', '\u2068', '\u2069', '\u00AD',
+    )
 
     fun parse(text: String): WireGuardProfile {
         require(text.length in 1..MAX_CONFIG_CHARS) { "wireguard_config_size_invalid" }
@@ -75,8 +80,14 @@ internal object WireGuardConfigParser {
                 when (section) {
                     "interface" -> when (key) {
                         "privatekey" -> { require(privateKey == null) { "wireguard_private_key_duplicate" }; privateKey = decodeKey(value, false) }
-                        "address" -> value.split(',').forEach { addresses += parseInterfaceAddress(it.trim()) }
-                        "dns" -> value.split(',').forEach { dns += parseDns(it.trim()) }
+                        "address" -> value.split(',').map(::trimConfigWhitespace).filter { it.isNotEmpty() }.forEach { addresses += parseInterfaceAddress(it) }
+                        "dns" -> value.split(',').map(::trimConfigWhitespace).filter { it.isNotEmpty() }.forEach { token ->
+                            if (InetAddresses.isNumericAddress(token)) {
+                                dns += parseDns(token)
+                            } else if (!looksLikeSearchDomain(token)) {
+                                throw IllegalArgumentException("wireguard_dns_invalid")
+                            }
+                        }
                         "mtu" -> {
                             require(!mtuSeen) { "wireguard_mtu_duplicate" }
                             mtuSeen = true
@@ -98,7 +109,7 @@ internal object WireGuardConfigParser {
                         "publickey" -> { require(publicKey == null) { "wireguard_public_key_duplicate" }; publicKey = decodeKey(value, false) }
                         "presharedkey" -> { require(presharedKey == null) { "wireguard_preshared_key_duplicate" }; presharedKey = decodeKey(value, true) }
                         "endpoint" -> { require(endpointHost == null) { "wireguard_endpoint_duplicate" }; parseEndpoint(value).also { endpointHost = it.first; endpointPort = it.second } }
-                        "allowedips" -> value.split(',').forEach { allowed += parseAllowedIp(it.trim()) }
+                        "allowedips" -> value.split(',').map(::trimConfigWhitespace).filter { it.isNotEmpty() }.forEach { allowed += parseAllowedIp(it) }
                         "persistentkeepalive" -> {
                             require(!keepaliveSeen) { "wireguard_keepalive_duplicate" }
                             keepaliveSeen = true
@@ -117,9 +128,12 @@ internal object WireGuardConfigParser {
             require(addresses.any { isIpv4(it.address) }) { "wireguard_ipv4_interface_required" }
             require(allowed.any { it.network == "0.0.0.0" && it.prefixLength == 0 }) { "wireguard_full_tunnel_ipv4_required" }
             val hasIpv6Interface = addresses.any { !isIpv4(it.address) }
-            val hasIpv6Default = allowed.any { !isIpv4(it.network) && it.prefixLength == 0 }
             val hasIpv6Dns = dns.any { !isIpv4(it) }
             require(!hasIpv6Dns || hasIpv6Interface) { "wireguard_ipv6_dns_requires_interface" }
+            if (!hasIpv6Interface && allowed.any { !isIpv4(it.network) }) {
+                allowed.removeAll { !isIpv4(it.network) }
+            }
+            val hasIpv6Default = allowed.any { !isIpv4(it.network) && it.prefixLength == 0 }
             require(!hasIpv6Interface || hasIpv6Default) { "wireguard_full_tunnel_ipv6_required" }
             require(!hasIpv6Default || hasIpv6Interface) { "wireguard_ipv6_default_requires_interface" }
             val profile = WireGuardProfile(
@@ -146,11 +160,51 @@ internal object WireGuardConfigParser {
 
     private fun normalizeImportedText(text: String): String {
         require(text.none { it == '\u0000' }) { "wireguard_config_control_char_invalid" }
-        return text
-            .replace("\r\n", "\n")
-            .replace('\r', '\n')
-            .replace('\u00A0', ' ')
-            .trim { it.isWhitespace() || it in edgeFormatChars }
+        val sb = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            when {
+                c == '\r' -> {
+                    sb.append('\n')
+                    if (i + 1 < text.length && text[i + 1] == '\n') i++
+                }
+                c in edgeFormatChars -> {
+                    // Strip zero-width and bidi clipboard formatting characters anywhere in the text.
+                }
+                c == '\u00A0' || c in '\u2000'..'\u200A' || c == '\u202F' || c == '\u205F' || c == '\u3000' -> sb.append(' ')
+                c == '\uFF1D' -> sb.append('=')
+                else -> sb.append(c)
+            }
+            i++
+        }
+        val rawLines = sb.toString().lines()
+        val merged = ArrayList<String>(rawLines.size)
+        for (raw in rawLines) {
+            val trimmed = trimConfigWhitespace(raw.substringBefore('#'))
+            if (trimmed.isNotEmpty() && merged.isNotEmpty() && isWrappedKeyContinuation(merged.last(), trimmed)) {
+                merged[merged.lastIndex] = merged.last() + trimmed
+            } else {
+                merged += raw
+            }
+        }
+        return merged.joinToString("\n").trim { it.isWhitespace() || it in edgeFormatChars }
+    }
+
+    private fun isWrappedKeyContinuation(previousRaw: String, currentTrimmed: String): Boolean {
+        if (currentTrimmed.startsWith('[')) return false
+        val prev = trimConfigWhitespace(previousRaw.substringBefore('#'))
+        val eq = prev.indexOf('=')
+        if (eq <= 0) return false
+        val prevKey = trimConfigWhitespace(prev.substring(0, eq)).lowercase()
+        if (prevKey != "privatekey" && prevKey != "publickey" && prevKey != "presharedkey") return false
+        val prevVal = trimConfigWhitespace(prev.substring(eq + 1)).removeSurrounding("\"").removeSurrounding("'")
+        if (prevVal.length >= 43) return false
+        val candidate = currentTrimmed.removeSurrounding("\"").removeSurrounding("'")
+        if (candidate.isEmpty() || candidate.length > 64) return false
+        val innerEq = candidate.indexOf('=')
+        if (innerEq >= 0 && innerEq < candidate.length - 2) return false
+        return candidate.all { it.isLetterOrDigit() || it == '+' || it == '/' || it == '=' || it == '-' || it == '_' }
     }
 
     private fun trimConfigWhitespace(value: String): String =
@@ -177,22 +231,65 @@ internal object WireGuardConfigParser {
     }
 
     private fun decodeKey(value: String, allowZero: Boolean): ByteArray {
-        val decoded = try { Base64.decode(value, Base64.NO_WRAP) } catch (_: IllegalArgumentException) { throw IllegalArgumentException("wireguard_key_invalid") }
+        val cleaned = buildString(value.length) {
+            for (ch in value.trim().removeSurrounding("\"").removeSurrounding("'")) {
+                if (!ch.isWhitespace() && ch !in edgeFormatChars) append(ch)
+            }
+        }
+        require(cleaned.isNotEmpty()) { "wireguard_key_invalid" }
+        val decoded = if (cleaned.length == KEY_BYTES * 2 && cleaned.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
+            ByteArray(KEY_BYTES) { idx ->
+                cleaned.substring(idx * 2, idx * 2 + 2).toInt(16).toByte()
+            }
+        } else {
+            val standardBase64 = cleaned.replace('-', '+').replace('_', '/')
+            val padded = when (standardBase64.length % 4) {
+                2 -> "$standardBase64=="
+                3 -> "$standardBase64="
+                0 -> standardBase64
+                else -> throw IllegalArgumentException("wireguard_key_invalid")
+            }
+            try {
+                Base64.decode(padded, Base64.NO_WRAP)
+            } catch (_: IllegalArgumentException) {
+                throw IllegalArgumentException("wireguard_key_invalid")
+            }
+        }
         require(decoded.size == KEY_BYTES && (allowZero || decoded.any { it != 0.toByte() })) { "wireguard_key_invalid" }
         return decoded
     }
 
     private fun parseInterfaceAddress(value: String): WireGuardInterfaceAddress {
-        val split = value.lastIndexOf('/')
-        require(split > 0 && split < value.lastIndex) { "wireguard_address_invalid" }
-        val address = numeric(value.substring(0, split))
-        val prefix = value.substring(split + 1).toIntOrNull() ?: throw IllegalArgumentException("wireguard_address_prefix_invalid")
+        val cleaned = value.trim().removeSurrounding("\"").removeSurrounding("'")
+        val split = cleaned.lastIndexOf('/')
+        val address: InetAddress
+        val prefix: Int
+        if (split < 0) {
+            address = numeric(cleaned)
+            prefix = if (address is Inet4Address) 32 else 128
+        } else {
+            require(split > 0 && split < cleaned.lastIndex) { "wireguard_address_invalid" }
+            address = numeric(cleaned.substring(0, split))
+            prefix = cleaned.substring(split + 1).toIntOrNull() ?: throw IllegalArgumentException("wireguard_address_prefix_invalid")
+        }
         require(prefix in 0..if (address is Inet4Address) 32 else 128) { "wireguard_address_prefix_invalid" }
         require(
             !address.isAnyLocalAddress && !address.isMulticastAddress &&
                 !address.isLoopbackAddress && !address.isLinkLocalAddress,
         ) { "wireguard_address_invalid" }
         return WireGuardInterfaceAddress(normalize(address), prefix)
+    }
+
+    private fun looksLikeSearchDomain(token: String): Boolean {
+        val trimmed = token.trim().trimEnd('.')
+        if (trimmed.length !in 1..253 || ':' in trimmed || '/' in trimmed) return false
+        if (trimmed.all { it.isDigit() || it == '.' }) return false
+        return trimmed.split('.').all { label ->
+            label.length in 1..63 &&
+                label.first().isLetterOrDigit() &&
+                label.last().isLetterOrDigit() &&
+                label.all { it.isLetterOrDigit() || it == '-' }
+        }
     }
 
     private fun parseAllowedIp(value: String): WireGuardAllowedIp {

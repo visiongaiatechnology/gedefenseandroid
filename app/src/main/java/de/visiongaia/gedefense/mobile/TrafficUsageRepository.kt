@@ -56,8 +56,13 @@ class TrafficUsageRepository(context: Context) {
     }
 
     @Suppress("DEPRECATION") // NetworkStatsManager querySummary still uses legacy network-type constants.
-    fun queryLast24Hours(now: Long = System.currentTimeMillis()): TrafficUsageSnapshot {
-        val start = now - WINDOW_MS
+    fun queryLast24Hours(now: Long = System.currentTimeMillis()): TrafficUsageSnapshot =
+        queryWindow(24, now)
+
+    @Suppress("DEPRECATION")
+    fun queryWindow(hours: Int, now: Long = System.currentTimeMillis()): TrafficUsageSnapshot {
+        val safeHours = hours.coerceIn(1, 24 * 30)
+        val start = now - safeHours.toLong() * 60L * 60L * 1000L
         if (!hasUsageAccess()) return TrafficUsageSnapshot("PERMISSION_REQUIRED", now, start, 0, 0, emptyList(), "FULL_FLOW_REQUIRED")
 
         val usage = HashMap<Int, MutableUsage>()

@@ -384,7 +384,12 @@ class AppRuntime private constructor(private val application: Application) {
                 }
             }
             launchEnrichment("vault-journal") { recordVaultRecoveryJournal() }
-            launchEnrichment("geo-cache") { geoCountry.loadCached() }
+            launchEnrichment("geo-cache") {
+                if (geoCountry.loadCached().ready) {
+                    fullFlowAnalytics.reclassifyUnknownCountries(geoCountry::lookup)
+                    notifyStateChanged()
+                }
+            }
             launchEnrichment("asn-evidence-cache") { asnEvidence.loadCached() }
             launchEnrichment("origin") { originLocator.refresh() }
             launchEnrichment("malware-snapshot", malwareAnalysisBootstrap) {
@@ -1033,7 +1038,10 @@ class AppRuntime private constructor(private val application: Application) {
                 }
                 refreshFeedHealth()
                 state.setFeedSync(report.atMillis)
-                try { geoCountry.syncDue() } catch (error: Throwable) { RuntimeFailureLog.nonCritical("app-runtime", error) }
+                try {
+                    val geo = geoCountry.syncDue()
+                    if (geo.ready) fullFlowAnalytics.reclassifyUnknownCountries(geoCountry::lookup)
+                } catch (error: Throwable) { RuntimeFailureLog.nonCritical("app-runtime", error) }
                 try { asnEvidence.syncDue() } catch (error: Throwable) { RuntimeFailureLog.nonCritical("app-runtime", error) }
 
                 val policyRecords = threatIndex.get().count
@@ -1082,6 +1090,98 @@ class AppRuntime private constructor(private val application: Application) {
             return false
         }
         return true
+    }
+
+    private val autoFeedSyncRunning = AtomicBoolean(false)
+    private val lastAutoFeedSyncAttemptMillis = java.util.concurrent.atomic.AtomicLong(0L)
+    private val geoRecoveryRunning = AtomicBoolean(false)
+    private val lastGeoRecoveryAttemptMillis = java.util.concurrent.atomic.AtomicLong(0L)
+
+    fun ensureGeoCountryReadyAsync(nowMillis: Long = System.currentTimeMillis()) {
+        if (!securityBootstrapComplete()) return
+        if (geoCountry.snapshot().ready) return
+        val prev = lastGeoRecoveryAttemptMillis.get()
+        if (nowMillis - prev < GEO_RETRY_COOLDOWN_MS) return
+        if (!geoRecoveryRunning.compareAndSet(false, true)) return
+        lastGeoRecoveryAttemptMillis.set(nowMillis)
+        if (!executeBackground("geo-country-sync") {
+            try {
+                try { geoCountry.loadCached() } catch (error: Throwable) { RuntimeFailureLog.nonCritical("geo-country-sync", error) }
+                if (!geoCountry.snapshot().ready) {
+                    val state = geoCountry.syncDue()
+                    if (state.ready) {
+                        fullFlowAnalytics.reclassifyUnknownCountries(geoCountry::lookup)
+                    }
+                } else {
+                    fullFlowAnalytics.reclassifyUnknownCountries(geoCountry::lookup)
+                }
+                notifyStateChanged()
+            } catch (error: Throwable) {
+                RuntimeFailureLog.nonCritical("geo-country-sync", error)
+            } finally {
+                geoRecoveryRunning.set(false)
+            }
+        }) {
+            geoRecoveryRunning.set(false)
+        }
+    }
+
+    fun maybeAutoSyncThreatFeeds(nowMillis: Long = System.currentTimeMillis()) {
+        if (!securityBootstrapComplete()) return
+        if (!geoCountry.snapshot().ready) {
+            ensureGeoCountryReadyAsync(nowMillis)
+        }
+        val lastSync = state.lastFeedSync()
+        val anyStale = feedHealth.get().any { !it.fresh }
+        val dueByAge = lastSync <= 0L || (nowMillis - lastSync) >= AUTO_FEED_SYNC_INTERVAL_MS
+        val dueByStale = anyStale && (nowMillis - lastSync) >= AUTO_FEED_STALE_RETRY_MS
+        if (!dueByAge && !dueByStale) return
+        val prevAttempt = lastAutoFeedSyncAttemptMillis.get()
+        if (nowMillis - prevAttempt < AUTO_FEED_ATTEMPT_COOLDOWN_MS) return
+        if (!autoFeedSyncRunning.compareAndSet(false, true)) return
+        lastAutoFeedSyncAttemptMillis.set(nowMillis)
+        if (!executeBackground("auto-feed-sync") {
+            try {
+                val report = try {
+                    feeds.syncDue()
+                } catch (error: Throwable) {
+                    RuntimeFailureLog.nonCritical("auto-feed-sync", error)
+                    null
+                }
+                try {
+                    val geo = geoCountry.syncDue()
+                    if (geo.ready) fullFlowAnalytics.reclassifyUnknownCountries(geoCountry::lookup)
+                } catch (error: Throwable) {
+                    RuntimeFailureLog.nonCritical("auto-geo-sync", error)
+                }
+                try {
+                    asnEvidence.syncDue()
+                } catch (error: Throwable) {
+                    RuntimeFailureLog.nonCritical("auto-asn-sync", error)
+                }
+                if (report != null) {
+                    refreshFeedHealth()
+                    if (report.statuses.any { it.ok }) {
+                        state.setFeedSync(report.atMillis)
+                    }
+                    if (state.isVpnActive()) {
+                        try {
+                            application.startService(
+                                android.content.Intent(application, GeDefenseVpnService::class.java)
+                                    .setAction(GeDefenseVpnService.ACTION_REFRESH),
+                            )
+                        } catch (error: RuntimeException) {
+                            RuntimeFailureLog.nonCritical("auto-feed-vpn-refresh", error)
+                        }
+                    }
+                    notifyStateChanged()
+                }
+            } finally {
+                autoFeedSyncRunning.set(false)
+            }
+        }) {
+            autoFeedSyncRunning.set(false)
+        }
     }
 
     fun addStateListener(listener: () -> Unit) {
@@ -1151,6 +1251,10 @@ class AppRuntime private constructor(private val application: Application) {
         private const val RUNTIME_BOOTSTRAP_DEADLINE_MS = 12_000L
         private const val READINESS_QUEUE_CAPACITY = 16
         private const val DIRECT_GET_TIMEOUT_MS = 15_000L
+        private const val AUTO_FEED_SYNC_INTERVAL_MS = 24L * 60L * 60L * 1000L
+        private const val AUTO_FEED_STALE_RETRY_MS = 6L * 60L * 60L * 1000L
+        private const val AUTO_FEED_ATTEMPT_COOLDOWN_MS = 30L * 60L * 1000L
+        private const val GEO_RETRY_COOLDOWN_MS = 60_000L
         @Volatile private var INSTANCE: AppRuntime? = null
         private val initializationStarted = AtomicBoolean(false)
         private val initializationComplete = CountDownLatch(1)

@@ -1,8 +1,10 @@
 package de.visiongaia.gedefense.mobile
 
+import android.app.ActivityManager
 import android.content.Context
 import android.net.ConnectivityManager
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import de.visiongaia.gedefense.mobile.core.IpAddress
 import de.visiongaia.gedefense.mobile.core.PacketParser
 import java.io.FileInputStream
@@ -34,9 +36,13 @@ class PackageEgressGateResponder(
 ) : AutoCloseable {
     private val appContext = context.applicationContext
     private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
+    private val activityManager = appContext.getSystemService(ActivityManager::class.java)
     private val packages = AtomicReference(sanitizePackages(initialQuarantine))
     private val running = AtomicBoolean(true)
     private val closed = AtomicBoolean(false)
+    private val foregroundCacheLock = Any()
+    private var foregroundCacheAtElapsed = 0L
+    private var foregroundPackagesCache: Set<String> = emptySet()
     private val worker = Thread(::loop, "gedefense-package-egress-gate").apply { isDaemon = true }
 
     init {
@@ -47,7 +53,8 @@ class PackageEgressGateResponder(
         packages.set(sanitizePackages(next))
     }
 
-    fun enabled(): Boolean = packages.get().isNotEmpty()
+    fun enabled(): Boolean = packages.get().isNotEmpty() ||
+        AppRuntime.peek()?.firewallPolicy?.hasActiveEgressGatePolicies() == true
 
     private fun loop() {
         val input = FileInputStream(descriptor.fileDescriptor)
@@ -85,7 +92,9 @@ class PackageEgressGateResponder(
 
     private fun resolveVerdict(request: Request): Byte {
         val quarantine = packages.get()
-        if (quarantine.isEmpty()) return VERDICT_ALLOW
+        val runtime = AppRuntime.peek()
+        val smartRules = runtime?.firewallPolicy?.smartRulesSnapshot().orEmpty()
+        if (quarantine.isEmpty() && smartRules.isEmpty()) return VERDICT_ALLOW
         val ownerPackages = try {
             BoundedAndroidCall.call(OWNER_RESOLVE_TIMEOUT_MS) {
                 val uid = connectivity.getConnectionOwnerUid(
@@ -106,7 +115,74 @@ class PackageEgressGateResponder(
             emptyList()
         }
         if (ownerPackages.isEmpty()) return VERDICT_DENY
-        return if (ownerPackages.any { it in quarantine }) VERDICT_DENY else VERDICT_ALLOW
+        if (ownerPackages.any { it in quarantine }) return VERDICT_DENY
+        if (smartRules.isNotEmpty()) {
+            for (pkg in ownerPackages) {
+                when (smartRules[pkg] ?: AppEgressRule.ALLOW_ALL) {
+                    AppEgressRule.ALLOW_ALL -> Unit
+                    AppEgressRule.BLOCK_ALL -> return VERDICT_DENY
+                    AppEgressRule.LAN_ONLY -> {
+                        if (request.destination.isPublic()) return VERDICT_DENY
+                    }
+                    AppEgressRule.NO_BACKGROUND -> {
+                        if (!isPackageInForeground(pkg)) return VERDICT_DENY
+                    }
+                    AppEgressRule.NO_NEW_DOMAINS -> {
+                        if (request.destination.isPublic() && !isAllowedByLearnedDomains(runtime, pkg, request)) {
+                            return VERDICT_DENY
+                        }
+                    }
+                }
+            }
+        }
+        return VERDICT_ALLOW
+    }
+
+    private fun isPackageInForeground(packageName: String): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        val foreground = synchronized(foregroundCacheLock) {
+            if (now - foregroundCacheAtElapsed <= FOREGROUND_CACHE_TTL_MS) {
+                foregroundPackagesCache
+            } else {
+                val refreshed = queryForegroundPackages()
+                foregroundPackagesCache = refreshed
+                foregroundCacheAtElapsed = now
+                refreshed
+            }
+        }
+        return packageName in foreground
+    }
+
+    private fun queryForegroundPackages(): Set<String> = try {
+        val processes = activityManager?.runningAppProcesses.orEmpty()
+        val out = LinkedHashSet<String>(16)
+        for (proc in processes) {
+            if (proc.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE) {
+                proc.pkgList?.forEach { pkg ->
+                    if (validPackageName(pkg)) out += pkg
+                }
+            }
+        }
+        out
+    } catch (_: RuntimeException) {
+        emptySet()
+    }
+
+    private fun isAllowedByLearnedDomains(runtime: AppRuntime?, packageName: String, request: Request): Boolean {
+        val rt = runtime ?: return false
+        val profile = try { rt.behavior.profile(packageName) } catch (_: RuntimeException) { null } ?: return false
+        if (profile.knownDomains.isEmpty()) return false
+        val country = try { rt.geoCountry.lookup(request.destination) } catch (_: RuntimeException) { null }
+        if (country != null && profile.knownCountries.isNotEmpty() && country !in profile.knownCountries) {
+            return false
+        }
+        val appTraffic = try {
+            rt.fullFlowAnalytics.snapshot().apps.firstOrNull { it.owner == packageName }
+        } catch (_: RuntimeException) { null }
+        if (appTraffic != null && appTraffic.topDomains.any { it.domain !in profile.knownDomains }) {
+            return false
+        }
+        return true
     }
 
     private fun parse(bytes: ByteArray): Request? {
@@ -183,6 +259,7 @@ class PackageEgressGateResponder(
         private const val REQUEST_BYTES = 48
         private const val RESPONSE_BYTES = 12
         private const val OWNER_RESOLVE_TIMEOUT_MS = 250L
+        private const val FOREGROUND_CACHE_TTL_MS = 2_000L
         private const val MAX_PACKAGES = 256
         private const val MAX_PACKAGES_PER_UID = 8
         private const val VERDICT_ALLOW: Byte = 1

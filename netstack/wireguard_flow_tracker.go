@@ -11,6 +11,7 @@ import (
 type trackedPacketFlow struct {
 	stats        *flowTelemetry
 	lastActivity time.Time
+	sniInspected bool
 }
 
 type icmpEchoKey struct {
@@ -100,11 +101,29 @@ func (t *packetFlowTracker) handleOutbound(p parsedPacket, match policyMatch, ra
 	}
 	stats := tracked.stats
 	closeNow := p.Protocol == protoTCP && p.TCP.Flags&tcpRST != 0
+	var inspectTLS, inspectQUIC bool
+	if !tracked.sniInspected {
+		if p.Protocol == protoTCP && len(p.TCP.Payload) >= 43 {
+			tracked.sniInspected = true
+			inspectTLS = true
+		} else if p.Protocol == protoUDP && p.DstPort != 53 && len(p.UDP.Payload) >= 64 {
+			tracked.sniInspected = true
+			inspectQUIC = true
+		}
+	}
 	t.mu.Unlock()
 
 	if p.Protocol == protoUDP && p.DstPort == 53 {
 		if name := parseDNSQueryName(p.UDP.Payload); name != "" {
 			t.telemetry.dnsQuery(stats.ID, name)
+		}
+	} else if inspectTLS {
+		if meta, ok := parseTLSClientHello(p.TCP.Payload); ok {
+			t.telemetry.clientHello(stats.ID, meta)
+		}
+	} else if inspectQUIC {
+		if meta, ok := parseQUICInitialClientHello(p.UDP.Payload); ok {
+			t.telemetry.clientHello(stats.ID, meta)
 		}
 	}
 	if closeNow {

@@ -20,6 +20,7 @@ class FirewallActivity : Activity() {
     private lateinit var store: FirewallPolicyStore
     private lateinit var rootLayout: LinearLayout
     private lateinit var countText: TextView
+    private lateinit var smartCountText: TextView
     private lateinit var policyHealthHost: LinearLayout
     private lateinit var appsHost: LinearLayout
     private lateinit var allTab: TextView
@@ -75,6 +76,8 @@ class FirewallActivity : Activity() {
                 })
                 countText = GeDefenseUi.textView(this@FirewallActivity, "", 11f, GeDefenseUi.cyan, bold = true).apply { setPadding(0, dp(12), 0, 0) }
                 addView(countText)
+                smartCountText = GeDefenseUi.textView(this@FirewallActivity, "", 10f, GeDefenseUi.gold, bold = true).apply { setPadding(0, dp(4), 0, 0) }
+                addView(smartCountText)
                 policyHealthHost = LinearLayout(this@FirewallActivity).apply { orientation = LinearLayout.VERTICAL }
                 addView(policyHealthHost, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
                 addView(GeDefenseUi.actionButton(this@FirewallActivity, getString(R.string.firewall_select_mode), goldStyle = true) {
@@ -134,7 +137,9 @@ class FirewallActivity : Activity() {
     private fun render() {
         if (!::appsHost.isInitialized) return
         val allowed = store.allowedPackages()
+        val smartRules = store.smartRulesSnapshot()
         countText.text = getString(R.string.firewall_allowed_count, allowed.size)
+        smartCountText.text = getString(R.string.firewall_smart_summary, smartRules.size, allowed.size)
         renderPolicyHealth()
         listOf(allTab to Filter.ALL, userTab to Filter.USER, systemTab to Filter.SYSTEM, allowedTab to Filter.ALLOWED).forEach { (view, value) ->
             val active = value == filter
@@ -147,7 +152,7 @@ class FirewallActivity : Activity() {
                 Filter.ALL -> true
                 Filter.USER -> !it.systemApp
                 Filter.SYSTEM -> it.systemApp
-                Filter.ALLOWED -> it.packageName in allowed
+                Filter.ALLOWED -> it.packageName in allowed || it.smartRule != AppEgressRule.ALLOW_ALL
             }
         }
         if (filtered.isEmpty()) {
@@ -162,39 +167,116 @@ class FirewallActivity : Activity() {
         }
     }
 
+    private fun ruleLabelRes(rule: AppEgressRule): Int = when (rule) {
+        AppEgressRule.ALLOW_ALL -> R.string.firewall_rule_allow_all
+        AppEgressRule.LAN_ONLY -> R.string.firewall_rule_lan_only
+        AppEgressRule.NO_BACKGROUND -> R.string.firewall_rule_no_background
+        AppEgressRule.NO_NEW_DOMAINS -> R.string.firewall_rule_no_new_domains
+        AppEgressRule.BLOCK_ALL -> R.string.firewall_rule_block_all
+    }
+
+    private fun ruleColor(rule: AppEgressRule): Int = when (rule) {
+        AppEgressRule.ALLOW_ALL -> GeDefenseUi.green
+        AppEgressRule.LAN_ONLY -> GeDefenseUi.cyan
+        AppEgressRule.NO_BACKGROUND -> GeDefenseUi.gold
+        AppEgressRule.NO_NEW_DOMAINS -> GeDefenseUi.orange
+        AppEgressRule.BLOCK_ALL -> GeDefenseUi.red
+    }
+
     private fun appCard(item: FirewallPolicyStore.AppEntry, allowed: Boolean): View = FrameLayout(this).apply {
-        background = GeDefenseUi.glassPanelBackground(this@FirewallActivity, accent = if (allowed) GeDefenseUi.green else null, radius = 16)
+        val ruleAccent = ruleColor(item.smartRule)
+        background = GeDefenseUi.glassPanelBackground(
+            this@FirewallActivity,
+            accent = if (item.smartRule != AppEgressRule.ALLOW_ALL) ruleAccent else if (allowed) GeDefenseUi.green else null,
+            radius = 16,
+        )
         val row = LinearLayout(this@FirewallActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(13), dp(14), dp(13))
-            addView(VgtUiComponents.iconWell(this@FirewallActivity, if (item.systemApp) VgtIcon.SETTINGS else VgtIcon.SHIELD, if (allowed) GeDefenseUi.green else GeDefenseUi.cyan, 34), LinearLayout.LayoutParams(dp(34), dp(34)))
+            addView(
+                VgtUiComponents.iconWell(
+                    this@FirewallActivity,
+                    if (item.systemApp) VgtIcon.SETTINGS else VgtIcon.SHIELD,
+                    if (item.smartRule != AppEgressRule.ALLOW_ALL) ruleAccent else if (allowed) GeDefenseUi.green else GeDefenseUi.cyan,
+                    34,
+                ),
+                LinearLayout.LayoutParams(dp(34), dp(34)),
+            )
             addView(LinearLayout(this@FirewallActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), 0, dp(10), 0)
                 addView(GeDefenseUi.textView(this@FirewallActivity, item.label, 11.5f, GeDefenseUi.text, bold = true).apply { maxLines = 1 })
                 addView(GeDefenseUi.textView(this@FirewallActivity, item.packageName, 8.8f, GeDefenseUi.textDim).apply { maxLines = 1; setPadding(0, dp(2), 0, 0) })
             }, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(GeDefenseUi.pill(
-                this@FirewallActivity,
-                getString(if (allowed) R.string.firewall_allowed else R.string.firewall_blocked),
-                if (allowed) GeDefenseUi.green else GeDefenseUi.red,
-            ))
+            addView(LinearLayout(this@FirewallActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.END
+                addView(GeDefenseUi.pill(
+                    this@FirewallActivity,
+                    getString(ruleLabelRes(item.smartRule)),
+                    ruleAccent,
+                ))
+                addView(GeDefenseUi.pill(
+                    this@FirewallActivity,
+                    getString(if (allowed) R.string.firewall_allowed else R.string.firewall_blocked),
+                    if (allowed) GeDefenseUi.green else GeDefenseUi.red,
+                ).apply {
+                    (layoutParams as? LinearLayout.LayoutParams)?.topMargin = dp(4)
+                }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(4) })
+            })
         }
         addView(row, FrameLayout.LayoutParams(-1, -2))
         isClickable = true
         isFocusable = true
         setOnClickListener {
-            if (!store.setAllowed(item.packageName, !allowed)) {
-                Toast.makeText(this@FirewallActivity, R.string.xdr_policy_change_failed, Toast.LENGTH_LONG).show()
-                reload()
-                return@setOnClickListener
-            }
-            if (!refreshActiveLockdownOrFailClosed()) {
-                Toast.makeText(this@FirewallActivity, R.string.live_policy_refresh_failed_stopped, Toast.LENGTH_LONG).show()
-            }
-            reload()
+            showSmartFirewallRuleDialog(item, allowed)
         }
+    }
+
+    private fun showSmartFirewallRuleDialog(item: FirewallPolicyStore.AppEntry, allowed: Boolean) {
+        val rules = AppEgressRule.entries
+        val options = Array(rules.size + 1) { idx ->
+            if (idx < rules.size) {
+                val r = rules[idx]
+                val prefix = if (r == item.smartRule) "● " else "○ "
+                prefix + getString(ruleLabelRes(r))
+            } else {
+                getString(R.string.firewall_lockdown_toggle) + " (" +
+                    getString(if (allowed) R.string.firewall_allowed else R.string.firewall_blocked) + ")"
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.firewall_rule_dialog_title, item.label))
+            .setItems(options) { _, which ->
+                if (which in rules.indices) {
+                    val selectedRule = rules[which]
+                    if (!store.setSmartRule(item.packageName, selectedRule)) {
+                        Toast.makeText(this@FirewallActivity, R.string.xdr_policy_change_failed, Toast.LENGTH_LONG).show()
+                        reload()
+                        return@setItems
+                    }
+                    NativeGaiaNet.syncPackageEgressQuarantine(store.quarantinedPackages())
+                    if (!refreshActiveLockdownOrFailClosed()) {
+                        Toast.makeText(this@FirewallActivity, R.string.live_policy_refresh_failed_stopped, Toast.LENGTH_LONG).show()
+                    }
+                    runtime.notifyStateChanged()
+                    reload()
+                } else {
+                    if (!store.setAllowed(item.packageName, !allowed)) {
+                        Toast.makeText(this@FirewallActivity, R.string.xdr_policy_change_failed, Toast.LENGTH_LONG).show()
+                        reload()
+                        return@setItems
+                    }
+                    if (!refreshActiveLockdownOrFailClosed()) {
+                        Toast.makeText(this@FirewallActivity, R.string.live_policy_refresh_failed_stopped, Toast.LENGTH_LONG).show()
+                    }
+                    runtime.notifyStateChanged()
+                    reload()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
 

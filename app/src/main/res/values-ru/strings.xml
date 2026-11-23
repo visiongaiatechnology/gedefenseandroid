@@ -519,7 +519,7 @@
     <string name="port_sentinel_listener_summary" tools:ignore="PluralsCandidate">Слушателей: %1$d · %2$s</string>
     <string name="port_sentinel_ports">Защищённые порты: 1080 · 2222 · 2323 · 5555 · 8080 · 8443 (TCP/UDP)</string>
     <string name="port_sentinel_recent_title">Последние попытки</string>
-    <string name="port_sentinel_no_hits">Попытки Sentinel пока не зарегистрированы.</string>
+    <string name="port_sentinel_no_hits">Попытки Sentinel пока не зарегистрированы. За операторским CGNAT (4G/5G) или домашним NAT-роутером внешние бот-сканирования отбрасываются на узле провайдера; локальные сканирования из Wi-Fi на это устройство появятся здесь сразу.</string>
     <string name="port_sentinel_source">Источник %1$s:%2$d</string>
     <string name="port_sentinel_target">%1$s → локальный порт %2$d</string>
     <string name="port_sentinel_block">Запретить источник</string>
@@ -1126,12 +1126,12 @@
     <string name="update_experience_subtitle">Проверьте изменения безопасности и обновите защиту для этой версии.</string>
     <string name="update_experience_version">Версия %1$s</string>
     <string name="update_experience_whats_new">Что нового</string>
-    <string name="update_experience_threat_title">Самопроверка политики угроз</string>
-    <string name="update_experience_threat_body">Боевой путь ROUTE_BLOCK теперь можно проверять локально без внешнего тестового трафика.</string>
-    <string name="update_experience_state_title">Стабильное состояние после обновлений</string>
-    <string name="update_experience_state_body">Состояние настройки загружается до маршрутизации запуска. Integrity, Threat Intelligence, Geo и ASN используют стабильные при обновлении раздельные ключи вместо отдельных OEM HMAC-алиасов.</string>
-    <string name="update_experience_flow_title">Безопасный сценарий обновления</string>
-    <string name="update_experience_flow_body">Существующие установки остаются настроенными. После обновления GeDefense показывает только это сообщение, синхронизирует Threat Intelligence и затем проверяет защиту.</string>
+    <string name="update_experience_threat_title">Пассивный разбор TLS-SNI и QUIC</string>
+    <string name="update_experience_threat_body">GaiaNet пассивно извлекает TLS ClientHello (SNI, ALPN, JA3/JA4) и QUIC Initial домены без root и MITM-CA, включая встроенную офлайн-базу GeoIP.</string>
+    <string name="update_experience_state_title">Smart-Firewall и 7-дневный Атлас</string>
+    <string name="update_experience_state_body">Правила для приложений (Блок, Только LAN, Без новых доменов, Без фона) через PackageEgressGate и расширенный Атлас потоков за 24ч / 48ч / 7д.</string>
+    <string name="update_experience_flow_title">Glass-уведомления, LAN и XDR</string>
+    <string name="update_experience_flow_body">Компактные зелёные/красные карточки уведомлений, точная проверка HyperOS SELinux, улучшенный сканер Wi-Fi LAN и стабильный WireGuard.</string>
     <string name="update_experience_security_check">Обновление безопасности</string>
     <string name="update_experience_ready">Готово к синхронизации Threat Intelligence и активации защиты.</string>
     <string name="update_experience_sync_progress">Обновление Threat Intelligence · обработано источников: %1$d/%2$d</string>
@@ -1143,4 +1143,29 @@
     <string name="update_experience_action_running">Обновление Threat Intelligence…</string>
     <string name="update_experience_action_retry">Повторить обновление безопасности</string>
     <string name="update_experience_footer">Сообщение исчезнет только после подтверждённого перехода в защищённое состояние.</string>
+    <string name="firewall_smart_summary">Smart-правила: %1$d · Разрешения Lockdown: %2$d</string>
+    <string name="firewall_rule_allow_all">Разрешить всё</string>
+    <string name="firewall_rule_lan_only">Только LAN</string>
+    <string name="firewall_rule_no_background">Без фона</string>
+    <string name="firewall_rule_no_new_domains">Без новых доменов</string>
+    <string name="firewall_rule_block_all">Блокировать всё</string>
+    <string name="firewall_lockdown_toggle">Переключить разрешение Lockdown</string>
+    <string name="firewall_rule_dialog_title">Правило Smart-Firewall: %1$s</string>
+    <string name="traffic_map_expand">Увеличить Атлас (24ч / 48ч / 7д)</string>
+    <string name="atlas_fullscreen_title">Атлас утечек данных</string>
+    <string name="atlas_fullscreen_subtitle">Пассивный разбор TLS-SNI/QUIC и Geo-IP маршрутов по периодам</string>
+    <string name="atlas_window_live">Live</string>
+    <string name="atlas_window_24h">24 ч</string>
+    <string name="atlas_window_48h">48 ч</string>
+    <string name="atlas_window_7d">7 д</string>
+    <string name="atlas_window_summary">Маршрутов: %1$d · стран: %2$d · %3$s · заблокировано: %4$d</string>
+    <string name="atlas_domains_title">Обнаруженные домены (DNS / TLS-SNI / QUIC)</string>
+    <string name="atlas_no_domains">За выбранный период домены или SNI пока не зафиксированы.</string>
+    <string name="atlas_apps_title">Телеметрия приложений и направления</string>
+    <string name="atlas_no_apps">За выбранный период данных о трафике приложений пока нет.</string>
+    <string name="notif_card_title_clean">Всё чисто · Защита активна</string>
+    <string name="notif_card_title_alert">Тревога безопасности · Обнаружена проблема</string>
+    <string name="notif_card_badge_clean">GEDEFENSE · ЧИСТО</string>
+    <string name="notif_card_badge_alert">GEDEFENSE · ТРЕВОГА</string>
+    <string name="notif_card_metrics">Активных потоков: %1$d · заблокировано: %2$d</string>
 </resources>

@@ -64,6 +64,7 @@ type tcpFlow struct {
 	done                  chan struct{}
 	handshakeReady        chan struct{}
 	handshakeAcked        bool
+	tlsInspected          bool
 	closeOnce             sync.Once
 	lastActivity          atomic.Int64
 }
@@ -284,6 +285,24 @@ func (f *tcpFlow) handleClient(p parsedPacket) {
 			f.mu.Unlock()
 			f.sendAck(seq, ack)
 			return
+		}
+		if !f.tlsInspected {
+			f.tlsInspected = true
+			if meta, ok := parseTLSClientHello(seg.Payload); ok {
+				f.manager.telemetry.clientHello(f.stats.ID, meta)
+				if meta.SNI != "" && f.manager.privacy != nil {
+					decision := f.manager.privacy.decide(meta.SNI)
+					if decision.Action != privacyAllow {
+						f.manager.telemetry.privacy(p, meta.SNI, decision)
+						if decision.Action == privacyBlock {
+							f.mu.Unlock()
+							f.sendResetToClient()
+							f.close("privacy_tls_sni_block")
+							return
+						}
+					}
+				}
+			}
 		}
 		copyPayload := f.manager.getTCPBuffer(len(seg.Payload))
 		copy(copyPayload, seg.Payload)

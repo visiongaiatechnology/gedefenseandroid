@@ -6,11 +6,13 @@ import android.content.Context
 import de.visiongaia.gedefense.mobile.core.IpAddress
 import de.visiongaia.gedefense.mobile.core.IpPrefix
 import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStreamReader
 import java.net.Proxy
 import java.net.URI
@@ -30,7 +32,8 @@ class GeoCountryRepository(
     context: Context,
     private val integrityKeyProvider: () -> SecretKey?,
 ) {
-    private val root = File(context.filesDir, "geo-country")
+    private val appContext = context.applicationContext
+    private val root = File(appContext.filesDir, "geo-country")
     private val generations = File(root, "generations")
     private val activePointer = File(root, ACTIVE_POINTER_FILE)
     @Volatile private var index: GeoCountryIndex? = null
@@ -43,7 +46,7 @@ class GeoCountryRepository(
             state = GeoCountryState("UNAVAILABLE", 0L, 0, 0)
             return state
         }
-        val loaded = tryLoadIndex() ?: recoverLatestValidGeneration()
+        val loaded = tryLoadIndex() ?: recoverLatestValidGeneration() ?: tryInstallBundledSeedLocked()
         index = loaded
         state = if (loaded == null) GeoCountryState("MISSING", 0L, 0, 0)
         else GeoCountryState("READY", loaded.fetchedAtMillis, loaded.v4Records, loaded.v6Records)
@@ -57,6 +60,7 @@ class GeoCountryRepository(
     @Throws(InterruptedException::class)
     fun syncDue(now: Long = System.currentTimeMillis()): GeoCountryState {
         check(integrityKey() != null) { "geo integrity key unavailable" }
+        if (!state.ready) loadCached()
         val current = state
         if (current.ready && now - current.fetchedAtMillis < MIN_REFRESH_MS) return current
         ensureStorageJail()
@@ -119,45 +123,48 @@ class GeoCountryRepository(
         }
     }
 
-    private fun compileCsv(csv: File, outFile: File, family: Int): Int {
+    private fun compileCsv(csv: File, outFile: File, family: Int): Int =
+        BufferedReader(InputStreamReader(FileInputStream(csv), Charsets.US_ASCII), 64 * 1024).use { reader ->
+            compileCsvReader(reader, outFile, family)
+        }
+
+    private fun compileCsvReader(reader: BufferedReader, outFile: File, family: Int): Int {
         var records = 0
         var prev4End = -1L
         var prev6Hi = 0L
         var prev6Lo = 0L
         var hasPrev6 = false
         FileOutputStream(outFile).use { raw ->
-            DataOutputStream(raw).use { out ->
+            DataOutputStream(BufferedOutputStream(raw, 64 * 1024)).use { out ->
                 out.write(if (family == 4) MAGIC4 else MAGIC6)
                 out.writeInt(FORMAT_VERSION)
                 out.writeInt(0) // record count patched after validation
-                BufferedReader(InputStreamReader(FileInputStream(csv), Charsets.US_ASCII), 64 * 1024).use { reader ->
-                    while (true) {
-                        throwIfInterrupted()
-                        val line = reader.readLine() ?: break
-                        if (line.length > MAX_CSV_LINE) error("geo line exceeds bound")
-                        if (line.isBlank()) continue
-                        val parts = line.split(',')
-                        if (parts.size != 3) error("geo csv shape invalid")
-                        val start = IpPrefix.parseAddress(parts[0].trim()) ?: error("geo start invalid")
-                        val end = IpPrefix.parseAddress(parts[1].trim()) ?: error("geo end invalid")
-                        if (start.family != family || end.family != family) error("geo family mismatch")
-                        val cc = parts[2].trim().uppercase(Locale.ROOT)
-                        if (!cc.matches(Regex("[A-Z]{2}"))) error("geo country code invalid")
-                        if (family == 4) {
-                            val s = start.v4.toLong() and 0xffff_ffffL
-                            val e = end.v4.toLong() and 0xffff_ffffL
-                            if (s > e || (records > 0 && s <= prev4End)) error("geo ipv4 ranges unsorted or overlapping")
-                            out.writeInt(start.v4); out.writeInt(end.v4); out.writeShort(packCountry(cc)); out.writeShort(0)
-                            prev4End = e
-                        } else {
-                            if (compare128(start.v6Hi, start.v6Lo, end.v6Hi, end.v6Lo) > 0) error("geo ipv6 range reversed")
-                            if (hasPrev6 && compare128(start.v6Hi, start.v6Lo, prev6Hi, prev6Lo) <= 0) error("geo ipv6 ranges unsorted or overlapping")
-                            out.writeLong(start.v6Hi); out.writeLong(start.v6Lo); out.writeLong(end.v6Hi); out.writeLong(end.v6Lo)
-                            out.writeShort(packCountry(cc)); out.writeShort(0); out.writeInt(0)
-                            prev6Hi = end.v6Hi; prev6Lo = end.v6Lo; hasPrev6 = true
-                        }
-                        if (++records > MAX_RECORDS) error("geo record bound exceeded")
+                while (true) {
+                    throwIfInterrupted()
+                    val line = reader.readLine() ?: break
+                    if (line.length > MAX_CSV_LINE) error("geo line exceeds bound")
+                    if (line.isBlank()) continue
+                    val parts = line.split(',')
+                    if (parts.size != 3) error("geo csv shape invalid")
+                    val start = IpPrefix.parseAddress(parts[0].trim()) ?: error("geo start invalid")
+                    val end = IpPrefix.parseAddress(parts[1].trim()) ?: error("geo end invalid")
+                    if (start.family != family || end.family != family) error("geo family mismatch")
+                    val cc = parts[2].trim().uppercase(Locale.ROOT)
+                    if (!cc.matches(Regex("[A-Z]{2}"))) error("geo country code invalid")
+                    if (family == 4) {
+                        val s = start.v4.toLong() and 0xffff_ffffL
+                        val e = end.v4.toLong() and 0xffff_ffffL
+                        if (s > e || (records > 0 && s <= prev4End)) error("geo ipv4 ranges unsorted or overlapping")
+                        out.writeInt(start.v4); out.writeInt(end.v4); out.writeShort(packCountry(cc)); out.writeShort(0)
+                        prev4End = e
+                    } else {
+                        if (compare128(start.v6Hi, start.v6Lo, end.v6Hi, end.v6Lo) > 0) error("geo ipv6 range reversed")
+                        if (hasPrev6 && compare128(start.v6Hi, start.v6Lo, prev6Hi, prev6Lo) <= 0) error("geo ipv6 ranges unsorted or overlapping")
+                        out.writeLong(start.v6Hi); out.writeLong(start.v6Lo); out.writeLong(end.v6Hi); out.writeLong(end.v6Lo)
+                        out.writeShort(packCountry(cc)); out.writeShort(0); out.writeInt(0)
+                        prev6Hi = end.v6Hi; prev6Lo = end.v6Lo; hasPrev6 = true
                     }
+                    if (++records > MAX_RECORDS) error("geo record bound exceeded")
                 }
                 if (records < MIN_RECORDS) error("geo dataset implausibly small")
                 out.flush(); raw.fd.sync()
@@ -167,6 +174,48 @@ class GeoCountryRepository(
             raf.seek(8L); raf.writeInt(records); raf.fd.sync()
         }
         return records
+    }
+
+    private fun tryInstallBundledSeedLocked(): GeoCountryIndex? {
+        if (integrityKey() == null) return null
+        val seedNow = (System.currentTimeMillis() - MIN_REFRESH_MS).coerceAtLeast(1_700_000_000_000L)
+        return try {
+            ensureStorageJail()
+            val generationName = "gen-$seedNow-${UUID.randomUUID().toString().replace("-", "")}".lowercase(Locale.ROOT)
+            require(GENERATION_REGEX.matches(generationName)) { "geo generation name invalid" }
+            val stage = File(generations, ".$generationName.stage")
+            if (!stage.mkdir()) return null
+            var committed: File? = null
+            try {
+                val v4Out = File(stage, V4_FILE)
+                val v6Out = File(stage, V6_FILE)
+                val v4Records = BufferedReader(InputStreamReader(appContext.assets.open(SEED_V4_ASSET), Charsets.US_ASCII), 64 * 1024).use {
+                    compileCsvReader(it, v4Out, 4)
+                }
+                val v6Records = BufferedReader(InputStreamReader(appContext.assets.open(SEED_V6_ASSET), Charsets.US_ASCII), 64 * 1024).use {
+                    compileCsvReader(it, v6Out, 6)
+                }
+                SecureFiles.writeAtomic(
+                    File(stage, MANIFEST_FILE),
+                    buildManifest(seedNow, v4Records, v6Records, sha256(v4Out), sha256(v6Out)),
+                )
+                verifyGeneration(stage) ?: return null
+                committed = File(generations, generationName)
+                moveDirectoryAtomic(stage, committed)
+                SecureFiles.writeAtomic(activePointer, buildPointer(generationName, seedNow))
+                val loaded = tryLoadIndex() ?: return null
+                cleanupGenerations(generationName)
+                loaded
+            } catch (error: Throwable) {
+                if (stage.exists()) safeDeleteGeneration(stage)
+                if (committed != null && readAuthenticatedPointer()?.generationName != committed.name) safeDeleteGeneration(committed)
+                RuntimeFailureLog.nonCritical("geo-country-seed", error)
+                null
+            }
+        } catch (error: Throwable) {
+            RuntimeFailureLog.nonCritical("geo-country-seed", error)
+            null
+        }
     }
 
     private fun tryLoadIndex(): GeoCountryIndex? {
@@ -322,6 +371,19 @@ class GeoCountryRepository(
     }
 
     private fun downloadFile(url: String, maxBytes: Long): File {
+        var lastError: IOException? = null
+        repeat(2) { attempt ->
+            try {
+                return downloadFileOnce(url, maxBytes)
+            } catch (error: IOException) {
+                lastError = error
+                if (attempt == 1) throw error
+            }
+        }
+        throw (lastError ?: IOException("geo download failed"))
+    }
+
+    private fun downloadFileOnce(url: String, maxBytes: Long): File {
         var current = URI(url).toURL()
         var redirects = 0
         while (true) {
@@ -329,7 +391,7 @@ class GeoCountryRepository(
             require(current.protocol == "https" && current.userInfo == null && current.ref == null) { "geo URL must be HTTPS" }
             if (!allowedGeoHost(current.host)) error("geo host refused")
             val c = current.openConnection(Proxy.NO_PROXY) as? HttpsURLConnection ?: error("geo HTTPS required")
-            c.instanceFollowRedirects = false; c.connectTimeout = 10_000; c.readTimeout = 25_000; c.useCaches = false
+            c.instanceFollowRedirects = false; c.connectTimeout = 15_000; c.readTimeout = 60_000; c.useCaches = false
             c.setRequestProperty("User-Agent", "VGT-GeDefense-Mobile/0.6 geo-country")
             val code = c.responseCode
             if (code in intArrayOf(301, 302, 303, 307, 308)) {
@@ -412,6 +474,8 @@ class GeoCountryRepository(
         private const val MANIFEST_FILE = "geo.manifest"
         private const val V4_FILE = "country-v4.bin"
         private const val V6_FILE = "country-v6.bin"
+        private const val SEED_V4_ASSET = "geoip_seed_ipv4.csv"
+        private const val SEED_V6_ASSET = "geoip_seed_ipv6.csv"
         private const val MIN_RECORDS = 1000
         private const val MAX_RECORDS = 2_000_000
         private const val MAX_CSV_LINE = 256
@@ -442,7 +506,13 @@ private class GeoCountryIndex private constructor(
     val v4Records: Int,
     val v6Records: Int,
 ) {
-    fun lookup(address: IpAddress): String? = if (address.family == 4) lookup4(address) else lookup6(address)
+    fun lookup(address: IpAddress): String? {
+        if (address.family == 4) return lookup4(address)
+        if (address.v6Hi == 0L && (address.v6Lo ushr 32) == 0xffffL) {
+            return lookup4(IpAddress(4, v4 = address.v6Lo.toInt()))
+        }
+        return lookup6(address)
+    }
 
     private fun lookup4(address: IpAddress): String? {
         val needle = address.v4.toLong() and 0xffff_ffffL

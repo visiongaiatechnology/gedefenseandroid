@@ -8,8 +8,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -19,6 +21,7 @@ import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.os.SystemClock
+import android.widget.RemoteViews
 import de.visiongaia.gedefense.mobile.core.EvidenceEvent
 import de.visiongaia.gedefense.mobile.core.FlowTable
 import de.visiongaia.gedefense.mobile.core.PacketParser
@@ -70,6 +73,8 @@ class GeDefenseVpnService : VpnService() {
     private val activeWireGuardUnderlayGeneration = AtomicLong(-1L)
     private var underlyingFingerprint = ""
     @Volatile private var lastPowerConstrained: Boolean? = null
+    @Volatile private var lastNotificationAlert = false
+    @Volatile private var lastNotificationRefreshElapsed = 0L
     private val physicalNetworkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             // getNetworkCapabilities() is a Binder call. The richer capabilities callback normally
@@ -78,6 +83,14 @@ class GeDefenseVpnService : VpnService() {
             submitControl { updatePhysicalNetwork(network) }
         }
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) { updatePhysicalNetwork(network, caps) }
+        override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+            submitControl {
+                if (runtimeReady.get()) {
+                    val preferred = preferredPhysicalNetwork()
+                    if (preferred == network) portSentinel.rebind(network)
+                }
+            }
+        }
         override fun onLost(network: Network) {
             synchronized(networkLock) { physicalNetworks.remove(network) }
             applyPhysicalNetworks()
@@ -320,6 +333,7 @@ class GeDefenseVpnService : VpnService() {
         // An update notice is acknowledged only after Threat Intelligence sync completed and
         // the requested protection transition reached a real guarded state.
         runtime.setup.completePendingUpdateAfterProtection()
+        runtime.maybeAutoSyncThreatFeeds()
         armStrictInvariantWatchdog()
         runtime.notifyStateChanged(); updateNotification()
         if (!appendEvidence(
@@ -447,6 +461,7 @@ class GeDefenseVpnService : VpnService() {
 
     private fun updateTransportPowerState(force: Boolean = false) {
         val constrained = isTransportPowerConstrained()
+        if (!constrained) runtime.maybeAutoSyncThreatFeeds()
         if (!force && lastPowerConstrained == constrained) return
         lastPowerConstrained = constrained
         runtime.state.setTransportPowerConstrained(constrained)
@@ -795,7 +810,12 @@ class GeDefenseVpnService : VpnService() {
             return false
         }
         val sessionGeneration = fullFlowSessionGeneration.incrementAndGet()
-        val telemetry = FullFlowTelemetryReader(this, runtime, session.telemetryRead) { reason ->
+        val telemetry = FullFlowTelemetryReader(
+            context = this,
+            runtime = runtime,
+            descriptor = session.telemetryRead,
+            onBlockObserved = { maybePulseNotificationOnBlock() },
+        ) { reason ->
             // Fatal telemetry delivery crosses reader -> main -> control threads. A callback from a
             // session that was replaced in between must never recycle its healthy successor. Check
             // the transport generation on both sides of the control-queue handoff.
@@ -1339,21 +1359,97 @@ class GeDefenseVpnService : VpnService() {
     private fun notification(text: String): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val stop = PendingIntent.getService(this, 1, Intent(this, GeDefenseVpnService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return Notification.Builder(this, CHANNEL_ID).setSmallIcon(android.R.drawable.ic_lock_lock).setContentTitle(getString(R.string.app_name))
-            .setContentText(text).setContentIntent(open).addAction(
+        val alertState = isNotificationAlertActive()
+        val blockedCount = if (runtimeReady.get()) {
+            maxOf(runtime.metrics.snapshot().blockedPackets, runtime.fullFlowAnalytics.snapshot().blockedFlows)
+        } else 0L
+        val activeFlowsCount = if (runtimeReady.get()) {
+            if (runtime.state.protectionMode() == ProtectionMode.FULL_FLOW_BETA) runtime.fullFlowAnalytics.activeFlowCount()
+            else runtime.metrics.snapshot().activeFlows
+        } else 0
+        val cardTitle = getString(if (alertState) R.string.notif_card_title_alert else R.string.notif_card_title_clean)
+        val cardBadge = getString(if (alertState) R.string.notif_card_badge_alert else R.string.notif_card_badge_clean)
+        val metricsLine = getString(R.string.notif_card_metrics, activeFlowsCount, blockedCount)
+
+        val bgRes = if (alertState) R.drawable.bg_notification_glass_red else R.drawable.bg_notification_glass_green
+        val ringRes = if (alertState) R.drawable.bg_notification_logo_ring_red else R.drawable.bg_notification_logo_ring_green
+        val badgeColor = if (alertState) Color.parseColor("#FFFCA5A5") else Color.parseColor("#FF6EE7B7")
+        val subColor = if (alertState) Color.parseColor("#FFFECACA") else Color.parseColor("#FFCBE5DC")
+        val metricsColor = if (alertState) Color.parseColor("#FFFDA4AF") else Color.parseColor("#FF9FE8D0")
+
+        val compact = RemoteViews(packageName, R.layout.notification_gedefense_card).apply {
+            setInt(R.id.notif_card_root, "setBackgroundResource", bgRes)
+            setInt(R.id.notif_logo_ring, "setBackgroundResource", ringRes)
+            setImageViewResource(R.id.notif_logo, R.drawable.gedefense_logo)
+            setTextViewText(R.id.notif_title, "$cardTitle · $text")
+            setTextColor(R.id.notif_title, if (alertState) Color.parseColor("#FFFEE2E2") else Color.parseColor("#FFF8FAFC"))
+            setTextViewText(R.id.notif_subtitle, metricsLine)
+            setTextColor(R.id.notif_subtitle, metricsColor)
+        }
+        val expanded = RemoteViews(packageName, R.layout.notification_gedefense_card_expanded).apply {
+            setInt(R.id.notif_card_root_big, "setBackgroundResource", bgRes)
+            setInt(R.id.notif_logo_ring_big, "setBackgroundResource", ringRes)
+            setImageViewResource(R.id.notif_logo_big, R.drawable.gedefense_logo)
+            setTextViewText(R.id.notif_badge_big, cardBadge)
+            setTextColor(R.id.notif_badge_big, badgeColor)
+            setTextViewText(R.id.notif_title_big, cardTitle)
+            setTextViewText(R.id.notif_subtitle_big, text)
+            setTextColor(R.id.notif_subtitle_big, subColor)
+            setTextViewText(R.id.notif_metrics_big, metricsLine)
+            setTextColor(R.id.notif_metrics_big, metricsColor)
+        }
+
+        val builder = Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setColor(if (alertState) Color.parseColor("#EF4444") else Color.parseColor("#10B981"))
+            .setContentTitle(cardTitle)
+            .setContentText("$text · $metricsLine")
+            .setContentIntent(open)
+            .addAction(
                 Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_delete), getString(R.string.notification_stop), stop).build(),
             )
-            .setOngoing(true).setCategory(Notification.CATEGORY_SERVICE).build()
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+        try {
+            builder.setCustomContentView(compact)
+            builder.setCustomBigContentView(expanded)
+            builder.setStyle(Notification.DecoratedCustomViewStyle())
+        } catch (error: RuntimeException) {
+            RuntimeFailureLog.nonCritical("notification-custom-card", error)
+        }
+        return builder.build()
+    }
+
+    private fun isNotificationAlertActive(): Boolean {
+        if (!runtimeReady.get()) return false
+        val status = runtime.state.lastVpnStatus()
+        if (status !in setOf("GUARDED", "FULL_GUARDED", "LOCKDOWN_GUARDED", "STARTING")) return true
+        if (!runtime.evidenceHealth.ok || !runtime.integritySnapshot.get().ok) return true
+        val xdrSnap = try { runtime.xdr.snapshot() } catch (_: RuntimeException) { null }
+        if (xdrSnap != null && (xdrSnap.criticalIncidents > 0 || xdrSnap.highIncidents > 0 || xdrSnap.quarantinedPackages.isNotEmpty())) return true
+        return false
     }
 
     private fun updateNotification() {
-        val text = when (runtime.state.lastVpnStatus()) {
+        val status = if (runtimeReady.get()) runtime.state.lastVpnStatus() else "STARTING"
+        val text = when (status) {
             "FULL_GUARDED" -> getString(R.string.vpn_full_guarded)
             "LOCKDOWN_GUARDED" -> getString(R.string.vpn_lockdown_guarded)
             "GUARDED" -> getString(R.string.vpn_guarded)
             else -> getString(R.string.vpn_degraded)
         }
+        lastNotificationAlert = isNotificationAlertActive()
+        lastNotificationRefreshElapsed = SystemClock.elapsedRealtime()
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
+    }
+
+    private fun maybePulseNotificationOnBlock() {
+        val now = SystemClock.elapsedRealtime()
+        val alertNow = isNotificationAlertActive()
+        if ((alertNow && !lastNotificationAlert) || now - lastNotificationRefreshElapsed >= NOTIFICATION_PULSE_INTERVAL_MS) {
+            submitControl { if (running.get()) updateNotification() }
+        }
     }
 
     companion object {
@@ -1366,6 +1462,7 @@ class GeDefenseVpnService : VpnService() {
         const val ACTION_RECOVERY_SELF_TEST = "de.visiongaia.gedefense.mobile.RECOVERY_SELF_TEST"
         private const val CHANNEL_ID = "gedefense_protection"
         private const val NOTIFICATION_ID = 4701
+        private const val NOTIFICATION_PULSE_INTERVAL_MS = 8_000L
         private const val RUNTIME_INITIALIZATION_TIMEOUT_MS = 15_000L
         private const val VPN_DISCLOSURE_BOOTSTRAP_TIMEOUT_MS = 10_000L
         private const val MODE_STORE_BOOTSTRAP_TIMEOUT_MS = 10_000L

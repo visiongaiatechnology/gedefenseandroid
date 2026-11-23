@@ -1,10 +1,14 @@
 package de.visiongaia.gedefense.mobile
 
+import android.Manifest
 import android.app.Activity
+import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.content.pm.PackageManager
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
@@ -141,7 +145,7 @@ class WireGuardActivity : Activity() {
             minLines = 6
             maxLines = 12
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
             setTextColor(GeDefenseUi.text)
@@ -302,7 +306,19 @@ class WireGuardActivity : Activity() {
     }
 
     private fun importPastedConfig() {
-        val text = configInput.text?.toString().orEmpty()
+        var text = configInput.text?.toString().orEmpty()
+        if (text.isBlank()) {
+            text = try {
+                val clipboard = getSystemService(ClipboardManager::class.java)
+                val clip = clipboard?.primaryClip
+                if (clip != null && clip.itemCount > 0) {
+                    clip.getItemAt(0)?.coerceToText(this)?.toString().orEmpty()
+                } else ""
+            } catch (error: RuntimeException) {
+                RuntimeFailureLog.nonCritical("wireguard-clipboard", error)
+                ""
+            }
+        }
         if (text.isBlank()) {
             showImportResult(WireGuardImportResult(false, "wireguard_config_empty"))
             return
@@ -351,6 +367,15 @@ class WireGuardActivity : Activity() {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = "*/*"
+                putExtra(
+                    Intent.EXTRA_MIME_TYPES,
+                    arrayOf("*/*", "application/octet-stream", "text/plain", "application/x-wireguard-profile"),
+                )
+                putExtra("android.content.extra.SHOW_ADVANCED", true)
+                putExtra(
+                    DocumentsContract.EXTRA_INITIAL_URI,
+                    Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload"),
+                )
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }, REQUEST_IMPORT)
         } catch (_: RuntimeException) {
@@ -368,6 +393,25 @@ class WireGuardActivity : Activity() {
             Toast.makeText(this, R.string.wireguard_qr_camera_unavailable, Toast.LENGTH_LONG).show()
             return
         }
+        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), REQUEST_CAMERA_PERMISSION)
+            return
+        }
+        launchQrScannerIntent()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                launchQrScannerIntent()
+            } else {
+                Toast.makeText(this, R.string.wireguard_qr_scanner_failed, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun launchQrScannerIntent() {
         try {
             val intent = ScanOptions()
                 .setCaptureActivity(WireGuardQrScannerActivity::class.java)
@@ -453,6 +497,7 @@ class WireGuardActivity : Activity() {
     companion object {
         private const val REQUEST_IMPORT = 9401
         private const val REQUEST_QR_IMPORT = 9402
+        private const val REQUEST_CAMERA_PERMISSION = 9403
         private const val MAX_CONFIG_BYTES = 16 * 1024
     }
 }

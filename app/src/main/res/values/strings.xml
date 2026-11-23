@@ -519,7 +519,7 @@ Policy fingerprint: %3$s…</string>
     <string name="port_sentinel_listener_summary" tools:ignore="PluralsCandidate">%1$d listeners · %2$s</string>
     <string name="port_sentinel_ports">Protected ports: 1080 · 2222 · 2323 · 5555 · 8080 · 8443 (TCP/UDP)</string>
     <string name="port_sentinel_recent_title">Recent probes</string>
-    <string name="port_sentinel_no_hits">No Sentinel probes recorded yet.</string>
+    <string name="port_sentinel_no_hits">No Sentinel probes recorded yet. Behind carrier CGNAT (4G/5G) or a home NAT router, unsolicited external internet scans are dropped upstream; local Wi-Fi LAN scans targeting this device will appear here.</string>
     <string name="port_sentinel_source">Source %1$s:%2$d</string>
     <string name="port_sentinel_target">%1$s → local port %2$d</string>
     <string name="port_sentinel_block">Deny source</string>
@@ -1121,12 +1121,12 @@ Validates loaded ThreatIndex → ROUTE_BLOCK match → route coverage → GDTI s
     <string name="update_experience_subtitle">Review the security changes and refresh protection for this version.</string>
     <string name="update_experience_version">Version %1$s</string>
     <string name="update_experience_whats_new">What’s new</string>
-    <string name="update_experience_threat_title">Threat policy self-test</string>
-    <string name="update_experience_threat_body">The production ROUTE_BLOCK path can now be verified locally without generating external test traffic.</string>
-    <string name="update_experience_state_title">Update-stable security state</string>
-    <string name="update_experience_state_body">Setup state is loaded before startup routing. Integrity, Threat Intelligence, Geo and ASN now use update-stable, purpose-separated keys instead of individual OEM HMAC aliases.</string>
-    <string name="update_experience_flow_title">Safer update flow</string>
-    <string name="update_experience_flow_body">Existing installations remain configured. After an update GeDefense shows only this refresh, synchronizes Threat Intelligence and then verifies protection.</string>
+    <string name="update_experience_threat_title">Passive TLS-SNI &amp; QUIC parsing</string>
+    <string name="update_experience_threat_body">GaiaNet now extracts TLS ClientHello (SNI, ALPN, JA3/JA4) and QUIC Initial domains passively without root or MITM-CA — plus bundled offline GeoIP coverage.</string>
+    <string name="update_experience_state_title">Per-App Smart-Firewall &amp; 7d Atlas</string>
+    <string name="update_experience_state_body">Enforce Block All, LAN Only, No New Domains, or No Background per app via PackageEgressGate, and inspect 24h / 48h / 7d flows in the expanded Data-Leak Atlas.</string>
+    <string name="update_experience_flow_title">Glass notifications, LAN &amp; XDR fixes</string>
+    <string name="update_experience_flow_body">Adaptive green/red glass notification cards, accurate HyperOS SELinux detection, improved Wi-Fi LAN discovery, and hardened Samsung WireGuard stability.</string>
     <string name="update_experience_security_check">Security refresh</string>
     <string name="update_experience_ready">Ready to synchronize current Threat Intelligence and activate protection.</string>
     <string name="update_experience_sync_progress" tools:ignore="PluralsCandidate">Updating Threat Intelligence · %1$d/%2$d sources processed</string>
@@ -1138,4 +1138,29 @@ Validates loaded ThreatIndex → ROUTE_BLOCK match → route coverage → GDTI s
     <string name="update_experience_action_running">Updating Threat Intelligence…</string>
     <string name="update_experience_action_retry">Retry security refresh</string>
     <string name="update_experience_footer">This notice is only dismissed after the security refresh reaches a verified protection state.</string>
+    <string name="firewall_smart_summary">Smart rules: %1$d · Lockdown allowlist: %2$d</string>
+    <string name="firewall_rule_allow_all">Allow All</string>
+    <string name="firewall_rule_lan_only">LAN Only</string>
+    <string name="firewall_rule_no_background">No Background</string>
+    <string name="firewall_rule_no_new_domains">No New Domains</string>
+    <string name="firewall_rule_block_all">Block All</string>
+    <string name="firewall_lockdown_toggle">Lockdown allowlist toggle</string>
+    <string name="firewall_rule_dialog_title">Smart-Firewall policy: %1$s</string>
+    <string name="traffic_map_expand">Expand Atlas (24h / 48h / 7d)</string>
+    <string name="atlas_fullscreen_title">Data-Flow Atlas</string>
+    <string name="atlas_fullscreen_subtitle">Passive SNI/QUIC &amp; Geo-IP route telemetry across time windows</string>
+    <string name="atlas_window_live">Live</string>
+    <string name="atlas_window_24h">24h</string>
+    <string name="atlas_window_48h">48h</string>
+    <string name="atlas_window_7d">7d</string>
+    <string name="atlas_window_summary" tools:ignore="PluralsCandidate">%1$d routes · %2$d countries · %3$s · %4$d blocked</string>
+    <string name="atlas_domains_title">Observed Domains (DNS / TLS-SNI / QUIC)</string>
+    <string name="atlas_no_domains">No domain queries or TLS/QUIC SNIs observed in this window yet.</string>
+    <string name="atlas_apps_title">App Telemetry &amp; Destinations</string>
+    <string name="atlas_no_apps">No app telemetry recorded for this time window yet.</string>
+    <string name="notif_card_title_clean">Everything clean · Protected</string>
+    <string name="notif_card_title_alert">Security Alert · Issue Detected</string>
+    <string name="notif_card_badge_clean">GEDEFENSE · GUARDED</string>
+    <string name="notif_card_badge_alert">GEDEFENSE · ALERT</string>
+    <string name="notif_card_metrics" tools:ignore="PluralsCandidate">%1$d active flows · %2$d blocked</string>
 </resources>

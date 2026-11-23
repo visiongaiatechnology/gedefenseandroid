@@ -369,7 +369,7 @@ class ResilienceSupervisor(private val runtime: AppRuntime) {
         if (!runtime.state.isVpnActive() || runtime.state.protectionMode() != ProtectionMode.FULL_FLOW_BETA) return
         if (!runtime.firewallPolicy.integrityOk()) return
         val quarantined = runtime.firewallPolicy.quarantinedPackages().take(MAX_QUARANTINE_RECONCILE).toSet()
-        if (quarantined.isEmpty()) return
+        if (quarantined.isEmpty() && !runtime.firewallPolicy.hasActiveEgressGatePolicies()) return
         val active = NativeGaiaNet.packageEgressGateActive()
         if (active) return
         attemptRepair(

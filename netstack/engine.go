@@ -149,6 +149,9 @@ func (e *engine) run() {
 			if e.handlePrivacyDNS(packet, e.tunMTU) {
 				continue
 			}
+			if e.handlePrivacyTLSOrQUIC(packet) {
+				continue
+			}
 			match := e.policy.match(packet.Dst)
 			if match.Action == actionBlock {
 				e.telemetry.blocked(packet, match, packet.TotalLen)
@@ -207,7 +210,7 @@ func (e *engine) handlePrivacyDNS(packet parsedPacket, mtu int) bool {
 	if decision.Action != privacyBlock {
 		return false
 	}
-	response := buildDNSBlockedResponse(packet.UDP.Payload)
+	response := withDNSNegativeCacheSOA(buildDNSBlockedResponse(packet.UDP.Payload), 120)
 	if len(response) == 0 {
 		return true
 	}
@@ -218,6 +221,52 @@ func (e *engine) handlePrivacyDNS(packet parsedPacket, mtu int) bool {
 		}
 	}
 	return true
+}
+
+func (e *engine) handlePrivacyTLSOrQUIC(packet parsedPacket) bool {
+	if e.privacy == nil || !packet.HasPorts {
+		return false
+	}
+	switch packet.Protocol {
+	case protoTCP:
+		if len(packet.TCP.Payload) < 43 {
+			return false
+		}
+		meta, ok := parseTLSClientHello(packet.TCP.Payload)
+		if !ok || meta.SNI == "" {
+			return false
+		}
+		decision := e.privacy.decide(meta.SNI)
+		if decision.Action == privacyAllow {
+			return false
+		}
+		e.telemetry.privacy(packet, meta.SNI, decision)
+		if decision.Action != privacyBlock {
+			return false
+		}
+		e.writer.send(buildTCPPacket(
+			packet.Version, packet.Dst, packet.Src, packet.DstPort, packet.SrcPort,
+			packet.TCP.Ack, packet.TCP.Seq+uint32(len(packet.TCP.Payload)),
+			tcpRST|tcpACK, 0, nil, 0, false,
+		))
+		return true
+	case protoUDP:
+		if packet.DstPort == 53 || len(packet.UDP.Payload) < 64 {
+			return false
+		}
+		meta, ok := parseQUICInitialClientHello(packet.UDP.Payload)
+		if !ok || meta.SNI == "" {
+			return false
+		}
+		decision := e.privacy.decide(meta.SNI)
+		if decision.Action == privacyAllow {
+			return false
+		}
+		e.telemetry.privacy(packet, meta.SNI, decision)
+		return decision.Action == privacyBlock
+	default:
+		return false
+	}
 }
 
 func (e *engine) powerStateChanged() {

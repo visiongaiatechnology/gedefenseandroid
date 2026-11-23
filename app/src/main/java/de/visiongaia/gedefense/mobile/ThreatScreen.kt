@@ -117,6 +117,7 @@ class ThreatScreen(private val activity: Activity, private val actions: UiAction
         mapScope = GeDefenseUi.textView(activity, activity.getString(R.string.traffic_map_country_scope), 9.4f, GeDefenseUi.textDim)
         mapLegend = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         mapLocationButton = GeDefenseUi.actionButton(activity, activity.getString(R.string.traffic_map_use_location)) { actions.requestTrafficMapLocation() }
+        val expandAtlasButton = GeDefenseUi.actionButton(activity, activity.getString(R.string.traffic_map_expand), goldStyle = true) { actions.openTrafficAtlas() }
         root.addView(sectionCard(
             icon = VgtIcon.MAP,
             accent = GeDefenseUi.cyan,
@@ -126,6 +127,7 @@ class ThreatScreen(private val activity: Activity, private val actions: UiAction
             trafficMap,
             mapScope,
             mapLegend,
+            expandAtlasButton,
             mapLocationButton,
         ))
 

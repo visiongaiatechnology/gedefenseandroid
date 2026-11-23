@@ -3,17 +3,17 @@
 <p align="center"><strong>Lokale Android-Endpoint-Security, Netzwerkabwehr und XDR.</strong><br>Entwickelt von VisionGaiaTechnology für Umgebungen, in denen Sicherheitstelemetrie auf dem Gerät bleiben soll.</p>
 <p align="center"><a href="README.md">English</a> · <a href="README.de.md"><strong>Deutsch</strong></a> · <a href="README.ru.md">Русский</a> · <a href="README.zh-CN.md">简体中文</a></p>
 <p align="center">
-<img alt="Version" src="https://img.shields.io/badge/Version-0.28.0--beta1-D8A928?style=flat-square" />
-<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-59-64748B?style=flat-square" />
+<img alt="Version" src="https://img.shields.io/badge/Version-0.31.0-D8A928?style=flat-square" />
+<img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-62-64748B?style=flat-square" />
 <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
 <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
 <img alt="Privacy" src="https://img.shields.io/badge/Datenschutz-local--first-06B6D4?style=flat-square" />
 <img alt="License" src="https://img.shields.io/badge/Lizenz-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
 
-> [!CAUTION]
-> **Wichtiger Installationshinweis für Version 0.28.0-beta1:**
-> Falls bereits eine Vorversion von GeDefense Mobile auf dem Gerät installiert ist, muss diese vor der Installation von `0.28.0-beta1` **vollständig deinstalliert / gelöscht** werden (`Deinstallieren -> Neuinstallation`). Ein direktes Update („Drüberinstallieren“) schlägt fehl (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), da für diesen Release-Build ein aktualisierter Signaturschlüssel verwendet wurde.
+> [!NOTE]
+> **Installations- und Update-Hinweis für Version 0.31.0 (`VC 62`):**
+> Geräte mit bereits installiertem `0.28.0-beta1` (`VC 59`), `0.28.0-beta2` (`VC 60`) oder `0.30.0` (`VC 61`) können direkt per Update aktualisiert werden (identischer Signaturschlüssel). Nur Installationen vor `0.28.0` erfordern weiterhin eine vorherige Deinstallation (`Deinstallieren -> Neuinstallation`).
 
 > [!IMPORTANT]
 > GeDefense Mobile ist aktuell ein **Public-Beta-/Pre-Production-Security-Kandidat**. Die automatisierten Release-Gates sind umfangreich; OEM-Verhalten, VPN-Lifecycle und Update-/Migrationspfade müssen vor Hochrisiko-Produktiveinsatz weiterhin auf realen Geräten geprüft werden.
@@ -29,9 +29,9 @@ Die Architektur ist konsequent **local-first**: Sicherheitsentscheidungen erfolg
 | Bereich | Funktion |
 | --- | --- |
 | Netzwerkschutz | Full Flow `VpnService`, Direct-L4-Egress, Selective Routing und WireGuard-L3-Transport |
-| Threat Intelligence | Lokal kompilierte Threat-Policy mit deterministischer Feed-Autorität und Offline-Lookups |
-| Telemetry Shield | Lokales Blockieren bekannter Advertising-, Analytics- und optionaler Geräte-Telemetrie ohne TLS-MITM |
-| Encrypted-DNS Control | DoT-/DoQ-Kontrolle in strikten Profilen ohne manipulierte Root-CA |
+| Threat Intelligence | Lokal kompilierte Threat-Policy, gebündelter Offline-GeoIP-Seed (IPv4/IPv6) und Offline-Lookups |
+| Telemetry Shield | 626 auditierte Lokalregeln (`MALICIOUS_TELEMETRY` in Conservative/Balanced/Strict scharf, 34 `ESSENTIAL_*`-Schutzausnahmen, DNS-NXDOMAIN mit 120s RFC-2308-SOA-Negative-Cache, TLS/QUIC-SNI-Blocking & XDR-Retry-Storm-Erkennung) ohne TLS-MITM |
+| Encrypted-DNS Control | 19 verifizierte DoH-/DoT-Bootstrap-Domains + Port-853 DoT-/DoQ-Kontrolle in strikten Profilen ohne Root-CA |
 | EDR / XDR | Lokale Korrelation aus Package-, Verhalten-, Netzwerk-, Integritäts- und Hardening-Evidenz |
 | InstallGuard | Pre-Egress FlowGate sowie begrenzter Fast-/Deep-Scan frisch installierter Apps |
 | Malwareanalyse | Lokale App-/Package-Analyse und begrenztes Scannen freigegebener Speicherbereiche |
@@ -117,11 +117,15 @@ Exakter Offline-/Repro-Build: [`BUILD-RUNBOOK.md`](docs/release/BUILD-RUNBOOK.md
 
 ## Neueste Änderungen / Changelog
 
-### Version 0.28.0-beta1 (VersionCode 59) — Full-Flow XDR-Metriken & Cold-Boot-Fix
-* **Live-Dashboard & Metriken:** Behebung der statischen 0-Anzeigen im Full-Flow-Beta-Modus. Eindeutige Ziele (Bounded-Set `uniqueDestinations`), blockierte Pakete und aktive Apps (`attributedApps`) werden nun kontinuierlich in Echtzeit im Dashboard und den XDR-Kacheln erfasst und dargestellt.
-* **Onboarding & Setup-Assistent:** Behebung einer Cold-Boot-Race-Condition in `DeviceSetupManager`. Nach einem erzwungenen Beenden (Force Stop) oder Kaltstart ploppt der Einrichtungsassistent bei bereits abgeschlossenem Setup nicht mehr fälschlicherweise auf.
-* **Integrierte WireGuard-Bridge:** Volle Unterstützung für lokale Paket-Inspektion mit direktem Chaining über den integrierten WireGuard-Tunnel (Import via QR-Code-Scan, Text oder Datei).
-* **Release-Audits & Konsistenz:** Alle 12 VGT-Qualitäts- und Sicherheitsprüfungen (Durable Persistence, Main-Thread I/O, SBOM, i18n etc.) erfolgreich validiert.
+### Version 0.31.0 (VersionCode 62) — Kuratierter 626-Regel Telemetry Shield, Malicious Telemetry & Anti-Retry-Storm-Schutz
+* **626-Regel Privacy Intelligence Core:** Ausbau von [`privacy_intelligence_v1.tsv`](app/src/main/assets/privacy_intelligence_v1.tsv) von 27 auf 626 lizenzgeprüfte Regeln (OEM-Telemetrie für Xiaomi/HyperOS, Samsung, Huawei, Oppo/ColorOS/HeyTap, Vivo, Motorola; Analytics, Ads, Attribution, Crash/Diagnostics) inklusive **34 `ESSENTIAL_*`-Schutzausnahmen** (FCM-Push, Captive-Portal, Play Integrity, OEM-OTA/Cloud/IoT) und **19 verifizierten `ENCRYPTED_DNS`-Bootstrap-Hosts** (`CONSERVATIVE`: 262 aktive Block-Regeln, `BALANCED`: 417, `STRICT`: 584).
+* **Konsequente Abwehr bösartiger Telemetrie (`MALICIOUS_TELEMETRY`):** Neue Kategorie mit 30 Regeln für Firmware-Spyware (Adups/AdSunflower/AdFuture), getarntes Dark AdTech ohne Webpräsenz (`lazybumblebee.com`, `qa-analytics.com`, Bigo-Cluster), Supply-Chain-vorbelastete SDKs (`websdk.appsflyer.com`), AppMetrica, ByteDance `mssdk` und Session-Replay-Tracker — greift bereits im Standardprofil `CONSERVATIVE` sowie `BALANCED`/`STRICT` und eskaliert im `XdrEngine` mit `XdrSeverity.HIGH`.
+* **Anti-Retry-Storm & Stage-2-Compiler:** RFC-2308-Negative-Cache-`SOA` (`120s` TTL) in `netstack/dns.go` gegen SDK-Retry-Stürme, Sliding-Window-`TelemetryRetryStormTracker` (`privacy.retry_storm`) in `FullFlowAnalytics`/`XdrEngine` sowie deterministischer Feed-Compiler [`tools/privacy_feed_compiler.py`](tools/privacy_feed_compiler.py).
+
+### Highlights seit `0.28.0-beta1` (`0.28.0-beta2` VC 60 & `0.30.0` VC 61)
+* **Offline GeoIP-Seed (`0.30.0` / VC 61):** Gebündelte IPv4- (329.323 Ranges) und IPv6-Tabellen (13.860 Ranges) aus GeDefense Linux inkl. `::ffff:`-Normalisierung und `"ZZ"`-Backfill für sofortige Länderauflösung ab Kaltstart.
+* **Kompakte Glass-Notification & LAN/Sentinel-Härtung (`0.30.0` / VC 61):** Optimierte 2-Zeilen-Statuskarte (Grün bei Normalbetrieb, Rot nur bei echten XDR-Vorfällen/Quarantäne/Integritätsfehlern), VPN-bereinigte `selectLanNetwork()`-Erkennung, ephemerer mDNS-Fallback und Interface-Rebind in `PortSentinel`.
+* **Datenfluss-Atlas & passives TLS/QUIC-SNI (`0.28.0-beta1` / VC 59):** Zero-MITM TLS/QUIC-SNI-Inspektion im Direct- und WireGuard-Pfad, 7-Tage-Verlaufsfenster und App-basierte Smart-Firewall.
 
 > Der vollständige Versionsverlauf aller Builds befindet sich in [`CHANGELOG.md`](CHANGELOG.md).
 

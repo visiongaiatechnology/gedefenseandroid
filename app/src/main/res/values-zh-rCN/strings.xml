@@ -519,7 +519,7 @@
     <string name="port_sentinel_listener_summary" tools:ignore="PluralsCandidate">%1$d 个监听器 · %2$s</string>
     <string name="port_sentinel_ports">受保护端口：1080 · 2222 · 2323 · 5555 · 8080 · 8443（TCP/UDP）</string>
     <string name="port_sentinel_recent_title">最近探测</string>
-    <string name="port_sentinel_no_hits">尚未记录 Sentinel 探测。</string>
+    <string name="port_sentinel_no_hits">尚未记录 Sentinel 探测。在移动网络 CGNAT（4G/5G）或家庭 NAT 路由器后，来自公网的外部扫描通常已被上游丢弃；局域网内针对本设备的直接扫描会立即显示在此处。</string>
     <string name="port_sentinel_source">来源 %1$s:%2$d</string>
     <string name="port_sentinel_target">%1$s → 本地端口 %2$d</string>
     <string name="port_sentinel_block">拒绝来源</string>
@@ -1114,12 +1114,12 @@
     <string name="update_experience_subtitle">查看本版本的安全变更并刷新保护状态。</string>
     <string name="update_experience_version">版本 %1$s</string>
     <string name="update_experience_whats_new">更新内容</string>
-    <string name="update_experience_threat_title">威胁策略自检</string>
-    <string name="update_experience_threat_body">现在可以在本地验证生产 ROUTE_BLOCK 路径，无需生成外部测试流量。</string>
-    <string name="update_experience_state_title">更新稳定的安全状态</string>
-    <string name="update_experience_state_body">启动路由前会先加载持久化设置状态。Integrity、Threat Intelligence、Geo 和 ASN 现在使用更新稳定且按用途隔离的密钥，不再各自依赖 OEM HMAC 别名。</string>
-    <string name="update_experience_flow_title">更安全的更新流程</string>
-    <string name="update_experience_flow_body">现有安装会保持已配置状态。更新后 GeDefense 只显示此刷新页面，同步 Threat Intelligence，然后验证保护状态。</string>
+    <string name="update_experience_threat_title">被动 TLS-SNI 与 QUIC 解析</string>
+    <string name="update_experience_threat_body">GaiaNet 无需 Root 或 MITM-CA 即可被动解析 TLS ClientHello（SNI、ALPN、JA3/JA4）与 QUIC Initial 域名，并内置离线 GeoIP 数据库。</string>
+    <string name="update_experience_state_title">智能防火墙与 7 天外泄图谱</string>
+    <string name="update_experience_state_body">通过 PackageEgressGate 为每个应用设置完全拦截、仅局域网、禁止新域名或禁止后台，并在大图谱中查看 24h / 48h / 7d 流量。</string>
+    <string name="update_experience_flow_title">磨砂通知卡片、LAN 与 XDR 修复</string>
+    <string name="update_experience_flow_body">自适应绿/红双态紧凑通知卡片、准确的 HyperOS SELinux 检测、增强的 Wi-Fi 局域网扫描与更稳健的 WireGuard 支持。</string>
     <string name="update_experience_security_check">安全刷新</string>
     <string name="update_experience_ready">已准备好同步最新 Threat Intelligence 并激活保护。</string>
     <string name="update_experience_sync_progress">正在更新 Threat Intelligence · 已处理 %1$d/%2$d 个来源</string>
@@ -1131,4 +1131,29 @@
     <string name="update_experience_action_running">正在更新 Threat Intelligence…</string>
     <string name="update_experience_action_retry">重试安全刷新</string>
     <string name="update_experience_footer">仅当安全刷新达到已验证的保护状态后，此提示才会消失。</string>
+    <string name="firewall_smart_summary">智能规则：%1$d · 锁定放行：%2$d</string>
+    <string name="firewall_rule_allow_all">全部允许</string>
+    <string name="firewall_rule_lan_only">仅限局域网</string>
+    <string name="firewall_rule_no_background">禁止后台</string>
+    <string name="firewall_rule_no_new_domains">禁止新域名</string>
+    <string name="firewall_rule_block_all">完全阻止</string>
+    <string name="firewall_lockdown_toggle">切换锁定放行状态</string>
+    <string name="firewall_rule_dialog_title">智能防火墙规则：%1$s</string>
+    <string name="traffic_map_expand">放大图谱（24小时 / 48小时 / 7天）</string>
+    <string name="atlas_fullscreen_title">数据流向图谱</string>
+    <string name="atlas_fullscreen_subtitle">按时间窗口展示被动 TLS-SNI/QUIC 与 Geo-IP 路由遥测</string>
+    <string name="atlas_window_live">实时</string>
+    <string name="atlas_window_24h">24小时</string>
+    <string name="atlas_window_48h">48小时</string>
+    <string name="atlas_window_7d">7天</string>
+    <string name="atlas_window_summary">%1$d 条路径 · %2$d 个国家/地区 · %3$s · 已阻止 %4$d</string>
+    <string name="atlas_domains_title">观测域名（DNS / TLS-SNI / QUIC）</string>
+    <string name="atlas_no_domains">该时间窗口内暂未捕获到域名查询或 TLS/QUIC SNI。</string>
+    <string name="atlas_apps_title">应用遥测与目标分布</string>
+    <string name="atlas_no_apps">该时间窗口内暂无应用流量记录。</string>
+    <string name="notif_card_title_clean">一切正常 · 保护已开启</string>
+    <string name="notif_card_title_alert">安全警报 · 检测到异常风险</string>
+    <string name="notif_card_badge_clean">GEDEFENSE · 安全</string>
+    <string name="notif_card_badge_alert">GEDEFENSE · 警报</string>
+    <string name="notif_card_metrics">%1$d 个活动流 · 已阻止 %2$d</string>
 </resources>

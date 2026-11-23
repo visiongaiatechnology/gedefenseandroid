@@ -17,8 +17,8 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.28.0--beta1-D8A928?style=flat-square" />
-  <img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-59-64748B?style=flat-square" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.31.0-D8A928?style=flat-square" />
+  <img alt="VersionCode" src="https://img.shields.io/badge/VersionCode-62-64748B?style=flat-square" />
   <img alt="Android" src="https://img.shields.io/badge/Android-10%2B%20(API%2029%2B)-3DDC84?style=flat-square&logo=android&logoColor=white" />
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-1.9.24-7F52FF?style=flat-square&logo=kotlin&logoColor=white" />
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26.8-00ADD8?style=flat-square&logo=go&logoColor=white" />
@@ -29,9 +29,9 @@
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-2563EB?style=flat-square" />
 </p>
 
-> [!CAUTION]
-> **Important Installation Notice for Version 0.28.0-beta1:**
-> If an earlier version of GeDefense Mobile is already installed on your device, it must be **completely uninstalled** before installing `0.28.0-beta1` (`Uninstall -> Clean Install`). Direct in-place updates will fail with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an updated signing key is used for this release build.
+> [!NOTE]
+> **Installation & Update Notice for Version 0.31.0 (`VC 62`):**
+> Devices already running `0.28.0-beta1` (`VC 59`), `0.28.0-beta2` (`VC 60`) or `0.30.0` (`VC 61`) can update directly in-place (`0.31.0` uses the same signing identity). Only pre-`0.28.0` installations require a clean uninstall/reinstall first due to the key migration in `0.28.0-beta1`.
 
 > [!IMPORTANT]
 > GeDefense Mobile is currently a **public-beta / pre-production security candidate**. The release gates are extensive, but OEM behavior, VPN lifecycle details and update/migration paths must still be validated on real devices before high-risk production deployment.
@@ -53,9 +53,9 @@ The architecture is intentionally **local-first**: security decisions are made o
 | Area | Capability |
 | --- | --- |
 | Network protection | Full Flow `VpnService`, direct L4 egress, selective routing and WireGuard L3 transport |
-| Threat intelligence | Local compiled threat policy with deterministic feed authority and offline lookups |
-| Telemetry Shield | Local filtering of known advertising, analytics and optional device-telemetry endpoints without TLS interception |
-| Encrypted DNS control | DoT/DoQ controls in strict profiles, without installing a MITM root CA |
+| Threat intelligence | Local compiled threat policy with deterministic feed authority, bundled offline IPv4/IPv6 GeoIP seed and offline lookups |
+| Telemetry Shield | 626 curated local rules (`MALICIOUS_TELEMETRY` enforced in Conservative/Balanced/Strict, 34 `ESSENTIAL_*` guards, DNS NXDOMAIN + 120s RFC 2308 SOA negative caching, TLS/QUIC SNI blocking & XDR retry-storm detection) without TLS interception |
+| Encrypted DNS control | 19 verified DoH/DoT bootstrap domains + port-853 DoT/DoQ controls in strict profiles, without installing a MITM root CA |
 | EDR / XDR | Package, behavior, network, integrity and device-hardening evidence correlated locally |
 | InstallGuard | Pre-egress flow gate plus bounded Fast/Deep app scanning for newly installed packages |
 | Malware analysis | Local app/package and bounded shared-storage inspection |
@@ -174,11 +174,15 @@ The original master dossier is German. Translated editions are provided for repo
 
 ## Recent Changes / Changelog
 
-### Version 0.28.0-beta1 (VersionCode 59) — Full-Flow XDR Metrics & Cold Boot Fix
-* **Live Dashboard & Metrics:** Fixed zero-value metrics in Full Flow Beta mode. Unique destinations (bounded `uniqueDestinations` set), blocked packets, and active flow apps (`attributedApps`) are now continuously aggregated and reflected in real-time across Dashboard and XDR tiles.
-* **Onboarding & Setup Wizard:** Resolved cold-boot race condition in `DeviceSetupManager`. After a force stop or cold reboot, the initial setup wizard will no longer re-appear if setup was already completed.
-* **Integrated WireGuard Bridge:** Full support for local packet inspection with direct chaining over the embedded WireGuard tunnel (import via camera QR scanner, config file, or raw text).
-* **Release Audits & Consistency:** All 12 internal VGT quality and security gates (Durable Persistence, Main-Thread I/O, SBOM, i18n, etc.) verified and passing.
+### Version 0.31.0 (VersionCode 62) — Curated 626-Rule Telemetry Shield, Malicious Telemetry & Anti-Retry-Storm Protection
+* **Expanded 626-Rule Privacy Intelligence Core:** Upgraded [`privacy_intelligence_v1.tsv`](app/src/main/assets/privacy_intelligence_v1.tsv) from 27 to 626 license-audited rules covering OEM telemetry (Xiaomi/HyperOS, Samsung, Huawei, Oppo/ColorOS/HeyTap, Vivo, Motorola), analytics, ads, attribution, diagnostics/crash endpoints, **34 `ESSENTIAL_*` protection overrides** (FCM push, captive portal, Play Integrity, OEM OTA/cloud/IoT connectivity), and **19 verified `ENCRYPTED_DNS` bootstrap domains** (`CONSERVATIVE`: 262 active blocks, `BALANCED`: 417, `STRICT`: 584).
+* **Hostile Telemetry Enforcement (`MALICIOUS_TELEMETRY`):** Added `PrivacyCategory.MALICIOUS_TELEMETRY` (30 rules covering firmware exfiltrators such as Adups/AdSunflower/AdFuture, cloaked Dark AdTech clusters, compromised attribution SDK endpoints, Yandex AppMetrica, ByteDance `mssdk` fingerprinting, and session-replay harvesters) — blocked out-of-the-box in `CONSERVATIVE`, `BALANCED` and `STRICT` and escalated to `XdrSeverity.HIGH` in `XdrEngine`.
+* **Anti-Retry-Storm Negative Caching & XDR Correlation:** Added RFC 2308 negative-cache `SOA` Authority records (`TTL=120s`) to blocked `NXDOMAIN` replies in GaiaNet (`netstack/dns.go`), plus bounded sliding-window `TelemetryRetryStormTracker` alerts (`privacy.retry_storm`) in `FullFlowAnalytics` / `XdrEngine` and Stage-2 license/suffix-trie feed compiler [`tools/privacy_feed_compiler.py`](tools/privacy_feed_compiler.py).
+
+### Highlights Since `0.28.0-beta1` (`0.28.0-beta2` VC 60 & `0.30.0` VC 61)
+* **Offline Linux GeoIP Seed (`0.30.0` / VC 61):** Bundled coalesced IPv4 (329,323 ranges) and IPv6 (13,860 ranges) seed tables plus `::ffff:x.x.x.x` normalization and `"ZZ"` closed-flow backfill so country resolution works offline from first launch.
+* **Compact Notification Card, LAN Discovery & Port Sentinel (`0.30.0` / VC 61):** Redesigned collapsed glass notification strip with accurate alert-only crimson triggers, `NET_CAPABILITY_NOT_VPN` LAN discovery filtering, ephemeral mDNS fallback and `PortSentinel` link-change rebinding.
+* **Data-Flow Atlas & Passive TLS/QUIC SNI Inspection (`0.28.0-beta1` / VC 59):** Zero-MITM TLS `ClientHello` / QUIC Initial SNI enforcement across Direct and WireGuard modes, rolling 7-day time windows, and per-app Smart-Firewall egress controls.
 
 > For full historical release logs, see [`CHANGELOG.md`](CHANGELOG.md).
 

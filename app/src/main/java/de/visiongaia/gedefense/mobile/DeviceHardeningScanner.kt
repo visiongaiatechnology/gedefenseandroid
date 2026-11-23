@@ -1,5 +1,6 @@
 package de.visiongaia.gedefense.mobile
 
+import android.annotation.SuppressLint
 import android.app.KeyguardManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -80,20 +81,57 @@ class DeviceHardeningScanner(context: Context) {
     }
 
     private fun selinux(): HardeningFinding {
-        val value = runCatching { File("/sys/fs/selinux/enforce").takeIf(File::canRead)?.readText()?.trim() }.getOrNull()
-        return when (value) {
-            "1" -> pass("selinux", HardeningCategory.PLATFORM, "SELinux enforcement", "SELinux is enforcing mandatory access controls.", "selinux_enforce=1")
-            "0" -> fail("selinux", HardeningCategory.PLATFORM, HardeningSeverity.CRITICAL, "SELinux permissive", "SELinux is not enforcing mandatory access controls.", "selinux_enforce=0", "Restore an enforcing, vendor-supported Android build.", 25)
+        val enforceFile = File("/sys/fs/selinux/enforce")
+        val value = runCatching { enforceFile.takeIf(File::canRead)?.readText()?.trim() }.getOrNull()
+        val seLinuxApi = querySeLinuxEnforcement()
+        val bootProp = systemProperty("ro.boot.selinux").lowercase(Locale.ROOT)
+        val selfContext = readSmallFile("/proc/self/attr/current", 256).trim().trimEnd('\u0000')
+        val confinedDomain = selfContext.startsWith("u:r:") && !selfContext.startsWith("u:r:kernel:") && !selfContext.startsWith("u:r:su:")
+        val selinuxFsMounted = runCatching {
+            enforceFile.exists() || File("/sys/fs/selinux").isDirectory ||
+                readSmallFile("/proc/filesystems", 16 * 1024).contains("selinuxfs")
+        }.getOrDefault(false)
+        val macRestrictedEnforceRead = confinedDomain && selinuxFsMounted && !enforceFile.canRead() &&
+            bootProp != "permissive" && bootProp != "disabled" && bootProp != "0"
+
+        // Note: on Android 8+ / HyperOS, untrusted_app is denied read access to /sys/fs/selinux/enforce
+        // via SELinux MAC, which also causes android.os.SELinux.isSELinuxEnforced() (native
+        // security_getenforce) to return false on EACCES. Only treat seLinuxApi == false as permissive
+        // when the app is NOT MAC-confined or selinuxfs is genuinely unmounted.
+        return when {
+            value == "1" -> pass("selinux", HardeningCategory.PLATFORM, "SELinux enforcement", "SELinux is enforcing mandatory access controls.", "selinux_enforce=1")
+            value == "0" -> fail("selinux", HardeningCategory.PLATFORM, HardeningSeverity.CRITICAL, "SELinux permissive", "SELinux is not enforcing mandatory access controls.", "selinux_enforce=0", "Restore an enforcing, vendor-supported Android build.", 25)
+            bootProp == "permissive" || bootProp == "disabled" || bootProp == "0" ->
+                fail("selinux", HardeningCategory.PLATFORM, HardeningSeverity.CRITICAL, "SELinux permissive", "SELinux is not enforcing mandatory access controls.", "selinux_enforce=0; boot_prop=$bootProp", "Restore an enforcing, vendor-supported Android build.", 25)
+            seLinuxApi == true ->
+                pass("selinux", HardeningCategory.PLATFORM, "SELinux enforcement", "SELinux is enforcing mandatory access controls.", "selinux_enforce=1; source=android.os.SELinux")
+            macRestrictedEnforceRead ->
+                pass("selinux", HardeningCategory.PLATFORM, "SELinux enforcement", "SELinux is enforcing mandatory access controls and confining application domain access to selinuxfs.", "selinux_enforce=1; context=${selfContext.take(64)}")
+            seLinuxApi == false ->
+                fail("selinux", HardeningCategory.PLATFORM, HardeningSeverity.CRITICAL, "SELinux permissive", "SELinux is not enforcing mandatory access controls.", "selinux_enforce=0; source=android.os.SELinux", "Restore an enforcing, vendor-supported Android build.", 25)
             else -> unknown("selinux", HardeningCategory.PLATFORM, "SELinux enforcement", "SELinux state could not be read on this device.", "selinux_enforce=unknown")
         }
     }
 
     private fun verifiedBoot(): HardeningFinding {
-        val cmdline = readSmallFile("/proc/cmdline", 32 * 1024) + " " + readSmallFile("/proc/bootconfig", 64 * 1024)
+        val propVbState = systemProperty("ro.boot.verifiedbootstate").lowercase(Locale.ROOT)
+        val propVbmetaState = systemProperty("ro.boot.vbmeta.device_state").lowercase(Locale.ROOT)
+        val propFlashLocked = systemProperty("ro.boot.flash.locked").lowercase(Locale.ROOT)
+        val propVerityMode = systemProperty("ro.boot.veritymode").lowercase(Locale.ROOT)
+        val propTokens = buildList {
+            if (propVbState.isNotBlank()) add("androidboot.verifiedbootstate=$propVbState")
+            if (propVbmetaState.isNotBlank()) add("androidboot.vbmeta.device_state=$propVbmetaState")
+            if (propFlashLocked.isNotBlank()) add("androidboot.flash.locked=$propFlashLocked")
+            if (propVerityMode.isNotBlank()) add("androidboot.veritymode=$propVerityMode")
+        }.joinToString(" ")
+        val cmdline = readSmallFile("/proc/cmdline", 32 * 1024) + " " + readSmallFile("/proc/bootconfig", 64 * 1024) + " " + propTokens
         val normalized = cmdline.lowercase(Locale.ROOT)
-        val green = "verifiedbootstate=green" in normalized || "androidboot.verifiedbootstate=green" in normalized
-        val orange = "verifiedbootstate=orange" in normalized || "androidboot.verifiedbootstate=orange" in normalized
-        val unlocked = "flash.locked=0" in normalized || "androidboot.flash.locked=0" in normalized
+        val orange = "verifiedbootstate=orange" in normalized || "androidboot.verifiedbootstate=orange" in normalized ||
+            "verifiedbootstate=red" in normalized || "androidboot.verifiedbootstate=red" in normalized
+        val unlocked = "flash.locked=0" in normalized || "androidboot.flash.locked=0" in normalized ||
+            "vbmeta.device_state=unlocked" in normalized || "androidboot.vbmeta.device_state=unlocked" in normalized
+        val green = "verifiedbootstate=green" in normalized || "androidboot.verifiedbootstate=green" in normalized ||
+            (!orange && !unlocked && ("vbmeta.device_state=locked" in normalized || "flash.locked=1" in normalized))
         return when {
             unlocked || orange -> fail("verified_boot", HardeningCategory.PLATFORM, HardeningSeverity.HIGH, "Verified Boot / bootloader weakened", "Boot metadata indicates an unlocked or non-green verified boot state.", summarizeBoot(normalized), "Use a locked bootloader and a verified, trusted OS image where your threat model requires it.", 18)
             green -> pass("verified_boot", HardeningCategory.PLATFORM, "Verified Boot", "Boot metadata reports a green verified boot state.", summarizeBoot(normalized))
@@ -206,10 +244,25 @@ class DeviceHardeningScanner(context: Context) {
 
     private fun summarizeBoot(value: String): String {
         val tokens = value.split(' ', '\n').filter {
-            it.contains("verifiedbootstate") || it.contains("flash.locked") || it.contains("vbmeta.device_state")
-        }.take(6)
+            it.contains("verifiedbootstate") || it.contains("flash.locked") || it.contains("vbmeta.device_state") || it.contains("veritymode")
+        }.distinct().take(6)
         return if (tokens.isEmpty()) "boot_state=unknown" else tokens.joinToString(";").take(320)
     }
+
+    @SuppressLint("PrivateApi")
+    private fun systemProperty(key: String): String = runCatching {
+        val cls = Class.forName("android.os.SystemProperties")
+        val method = cls.getMethod("get", String::class.java, String::class.java)
+        (method.invoke(null, key, "") as? String)?.trim().orEmpty()
+    }.getOrDefault("")
+
+    @SuppressLint("PrivateApi")
+    private fun querySeLinuxEnforcement(): Boolean? = runCatching {
+        val cls = Class.forName("android.os.SELinux")
+        val enabled = cls.getMethod("isSELinuxEnabled").invoke(null) as? Boolean ?: return@runCatching null
+        if (!enabled) return@runCatching false
+        cls.getMethod("isSELinuxEnforced").invoke(null) as? Boolean
+    }.getOrNull()
 
     companion object {
         private const val ACTION_SYSTEM_UPDATE_SETTINGS = "android.settings.SYSTEM_UPDATE_SETTINGS"

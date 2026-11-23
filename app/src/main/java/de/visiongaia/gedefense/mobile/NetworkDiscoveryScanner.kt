@@ -11,6 +11,7 @@ import de.visiongaia.gedefense.mobile.core.MdnsDnsCodec
 import de.visiongaia.gedefense.mobile.core.MdnsDnsMessage
 import de.visiongaia.gedefense.mobile.core.NetworkRangePlanner
 import java.io.File
+import java.net.ConnectException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
@@ -39,7 +40,8 @@ class NetworkDiscoveryScanner(
         val gatewayAddress: String?,
     )
 
-    private data class ProbeResult(val ip: String, val openPorts: Set<Int>)
+    private data class ProbeResult(val ip: String, val openPorts: Set<Int>, val reachable: Boolean = openPorts.isNotEmpty())
+    private enum class ProbeOutcome { OPEN, REFUSED, UNREACHABLE }
     private data class MdnsSrv(val targetHost: String, val port: Int)
     private data class MdnsAggregate(
         val ptrs: MutableMap<String, MutableSet<String>> = linkedMapOf(),
@@ -100,7 +102,7 @@ class NetworkDiscoveryScanner(
                     interrupted = true
                     break
                 }
-                if (result != null && result.openPorts.isNotEmpty()) discovered[result.ip] = result
+                if (result != null && (result.openPorts.isNotEmpty() || result.reachable)) discovered[result.ip] = result
                 val done = progressCount.incrementAndGet()
                 onProgress(NetworkDiscoveryProgress(done, total, discovered.size, result?.ip.orEmpty()))
             }
@@ -157,6 +159,7 @@ class NetworkDiscoveryScanner(
     private fun selectLanNetwork(): SelectedNetwork? {
         val candidates = connectivity.allNetworks.mapNotNull { network ->
             val caps = connectivity.getNetworkCapabilities(network) ?: return@mapNotNull null
+            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) return@mapNotNull null
             val transport = when {
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
@@ -165,6 +168,9 @@ class NetworkDiscoveryScanner(
             val links = connectivity.getLinkProperties(network) ?: return@mapNotNull null
             val local = links.linkAddresses.firstOrNull { link ->
                 val address = link.address
+                address is Inet4Address && link.prefixLength < 32 && NetworkRangePlanner.isPrivateIpv4(address.address)
+            } ?: links.linkAddresses.firstOrNull { link ->
+                val address = link.address
                 address is Inet4Address && NetworkRangePlanner.isPrivateIpv4(address.address)
             } ?: return@mapNotNull null
             val gateway = links.routes.asSequence()
@@ -172,17 +178,30 @@ class NetworkDiscoveryScanner(
                 .mapNotNull { it.gateway as? Inet4Address }
                 .firstOrNull { NetworkRangePlanner.isPrivateIpv4(it.address) }
                 ?.hostAddress
-            SelectedNetwork(network, links, transport, local.address as Inet4Address, local.prefixLength, gateway)
+            val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            Pair(validated, SelectedNetwork(network, links, transport, local.address as Inet4Address, local.prefixLength, gateway))
         }
-        return candidates.firstOrNull { it.transport == "WIFI" } ?: candidates.firstOrNull()
+        return candidates
+            .sortedWith(
+                compareByDescending<Pair<Boolean, SelectedNetwork>> { it.second.transport == "WIFI" }
+                    .thenByDescending { it.first }
+                    .thenByDescending { it.second.gatewayAddress != null },
+            )
+            .firstOrNull()
+            ?.second
     }
 
     private fun probeHost(network: Network, ip: String, isGateway: Boolean, cancelled: () -> Boolean): ProbeResult {
         val open = linkedSetOf<Int>()
+        var reachable = false
         val firstPass = if (isGateway) ALL_PORTS else QUICK_PORTS
         for (port in firstPass) {
             if (cancelled()) break
-            if (canConnect(network, ip, port)) open += port
+            when (probePort(network, ip, port)) {
+                ProbeOutcome.OPEN -> { open += port; reachable = true }
+                ProbeOutcome.REFUSED -> reachable = true
+                ProbeOutcome.UNREACHABLE -> Unit
+            }
         }
         if (open.isNotEmpty() && !isGateway) {
             for (port in ALL_PORTS) {
@@ -190,17 +209,23 @@ class NetworkDiscoveryScanner(
                 if (port !in open && port !in QUICK_PORTS && canConnect(network, ip, port)) open += port
             }
         }
-        return ProbeResult(ip, open)
+        return ProbeResult(ip, open, reachable)
     }
 
-    private fun canConnect(network: Network, ip: String, port: Int): Boolean = try {
+    private fun canConnect(network: Network, ip: String, port: Int): Boolean =
+        probePort(network, ip, port) == ProbeOutcome.OPEN
+
+    private fun probePort(network: Network, ip: String, port: Int): ProbeOutcome = try {
         network.socketFactory.createSocket().use { socket ->
             socket.tcpNoDelay = true
             socket.connect(InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS)
-            true
+            ProbeOutcome.OPEN
         }
+    } catch (error: ConnectException) {
+        val msg = error.message.orEmpty()
+        if ("ECONNREFUSED" in msg || "Connection refused" in msg) ProbeOutcome.REFUSED else ProbeOutcome.UNREACHABLE
     } catch (_: Exception) {
-        false
+        ProbeOutcome.UNREACHABLE
     }
 
     private fun discoverSsdp(
@@ -265,7 +290,11 @@ class NetworkDiscoveryScanner(
             MulticastSocket(null).use { socket ->
                 socket.reuseAddress = true
                 selected.network.bindSocket(socket)
-                socket.bind(InetSocketAddress(MDNS_PORT))
+                try {
+                    socket.bind(InetSocketAddress(MDNS_PORT))
+                } catch (_: Exception) {
+                    socket.bind(InetSocketAddress(0))
+                }
                 socket.soTimeout = MDNS_RECEIVE_TIMEOUT_MS
                 socket.timeToLive = 255
                 socket.networkInterface = networkInterface
